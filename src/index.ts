@@ -1,0 +1,83 @@
+#!/usr/bin/env bun
+
+import { Command } from 'commander';
+import inquirer from 'inquirer';
+import { YouTubeScraper } from './scraper/YouTubeScraper';
+import { Config } from './types/Config';
+import { setupDirectories } from './utils/fileSystem';
+
+const program = new Command();
+
+program
+  .name('youtube-scraper')
+  .description('Scrape YouTube channel metadata and screenshots')
+  .version('1.0.0');
+
+program
+  .option('-u, --url <url>', 'YouTube channel URL (e.g., https://www.youtube.com/@WeAreUnidosUS)')
+  .option('-l, --limit <number>', 'Maximum number of videos to scrape', '50')
+  .option('-o, --offset <number>', 'Starting offset for pagination', '0')
+  .option('-d, --delay <number>', 'Base delay between requests (ms)', '1000')
+  .option('-r, --retries <number>', 'Max retries for failed requests', '3')
+  .option('--headless', 'Run browser in headless mode', false)
+  .option('--skip-screenshots', 'Skip taking screenshots', false)
+  .option('--verbose', 'Enable verbose logging', false);
+
+async function main() {
+  program.parse();
+  const options = program.opts();
+
+  console.log('🎭 YouTube Scraper');
+  console.log('Powered by Playwright + Bun\n');
+
+  let channelUrl = options.url;
+
+  // Prompt for URL if not provided
+  if (!channelUrl) {
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'url',
+        message: 'Enter the YouTube channel URL:',
+        validate: (input: string) => {
+          const urlPattern = /^https:\/\/www\.youtube\.com\/@[\w-]+$/;
+          return urlPattern.test(input) || 'Please enter a valid YouTube channel URL (e.g., https://www.youtube.com/@WeAreUnidosUS)';
+        }
+      }
+    ]);
+    channelUrl = answers.url;
+  }
+
+  const config: Config = {
+    channelUrl,
+    maxVideos: parseInt(options.limit),
+    offset: parseInt(options.offset),
+    baseDelay: parseInt(options.delay),
+    maxRetries: parseInt(options.retries),
+    headless: options.headless,
+    skipScreenshots: options.skipScreenshots,
+    verbose: options.verbose,
+    outputDir: `/media/rob/D/youtube/metadata/${extractChannelName(channelUrl)}`
+  };
+
+  try {
+    // Setup output directories
+    await setupDirectories(config.outputDir);
+
+    // Initialize and run scraper
+    const scraper = new YouTubeScraper(config);
+    await scraper.run();
+
+    console.log('\n✅ Scraping completed successfully!');
+  } catch (error) {
+    console.error('\n❌ Scraping failed:', error);
+    process.exit(1);
+  }
+}
+
+function extractChannelName(url: string): string {
+  const match = url.match(/\/@([^\/]+)/);
+  return match ? match[1] : 'unknown-channel';
+}
+
+main().catch(console.error); 
