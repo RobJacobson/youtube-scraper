@@ -66,7 +66,8 @@ async function initializeScraping(config: Config, logger: Logger): Promise<Scrap
   const context = await browser.newContext({
     viewport: { width: 1024, height: 720 },
     deviceScaleFactor: 1, // 125% zoom
-    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    colorScheme: config.useDarkMode ? 'dark' : 'light'
   });
 
   const backoff = new ExponentialBackoff(config.baseDelay, config.maxRetries);
@@ -333,11 +334,8 @@ async function dismissPopups(page: Page, logger: Logger): Promise<void> {
       'ytd-popup-container button:has-text("Skip")',
       'ytd-popup-container button:has-text("Not now")',
       
-      // Notification and subscription prompts
+      // Notification prompts (but avoid subscription actions)
       'button[aria-label*="Turn on notifications"]',
-      'button:has-text("Turn on")',
-      'button:has-text("Subscribe")',
-      'button:has-text("Enable")',
       
       // Overlay and modal close buttons
       '.ytd-popup-container button',
@@ -345,21 +343,20 @@ async function dismissPopups(page: Page, logger: Logger): Promise<void> {
       '.close-button',
       '.modal-close',
       
-      // Cookie consent (if any)
-      'button:has-text("Accept")',
-      'button:has-text("Accept all")',
-      'button:has-text("Reject")',
-      'button:has-text("Reject all")',
+      // Cookie consent (specific to consent dialogs only)
+      'button:has-text("Accept all"):has([role="dialog"])',
+      'button:has-text("Reject all"):has([role="dialog"])',
       
       // Survey and feedback popups
       'button:has-text("No, thanks")',
       'button:has-text("Maybe later")',
       'button[aria-label*="feedback"]',
       
-      // Age verification and content warnings
-      'button:has-text("I understand")',
-      'button:has-text("Continue")',
-      'button:has-text("Proceed")',
+      // Age verification and content warnings (specific contexts only)
+      'button:has-text("I understand and wish to proceed")',
+      '[role="dialog"] button:has-text("Continue")',
+      '[role="dialog"] button:has-text("Proceed")',
+      'button:has-text("I understand"):not(.ytp-button)',
       
       // Generic modal/dialog closes
       '[role="dialog"] button',
@@ -570,25 +567,73 @@ async function enableTheaterMode(page: Page, logger: Logger): Promise<void> {
 
 async function enableDarkMode(page: Page, logger: Logger): Promise<void> {
   try {
-    logger.debug('🌙 Enabling dark mode...');
+    logger.debug('🌙 Enabling dark mode using native browser methods...');
     
-    // Method 1: Try to find and click the dark mode toggle
-    const darkModeSelectors = [
+    // Method 1: Set browser context to prefer dark mode
+    await page.emulateMedia({ colorScheme: 'dark' });
+    logger.debug('✅ Browser color scheme set to dark');
+    
+    // Method 2: Set YouTube's localStorage preferences for dark mode
+    await page.evaluate(() => {
+      try {
+        // YouTube stores theme preference in localStorage
+        localStorage.setItem('yt-player-theme', 'dark');
+        localStorage.setItem('yt-remote-device-id', JSON.stringify({
+          'theme': 'dark'
+        }));
+        
+        // YouTube's internal preference storage
+        const ytInitialData = {
+          'INNERTUBE_CONTEXT': {
+            'theme': 'dark'
+          }
+        };
+        
+        // Set various YouTube preference keys that might control dark mode
+        const darkModeKeys = [
+          'yt-remote-session-app',
+          'yt-remote-session-name', 
+          'yt-player-quality',
+          'yt-player-av1-pref'
+        ];
+        
+        darkModeKeys.forEach(key => {
+          try {
+            const existing = localStorage.getItem(key);
+            if (existing) {
+              const parsed = JSON.parse(existing);
+              parsed.theme = 'dark';
+              localStorage.setItem(key, JSON.stringify(parsed));
+            }
+          } catch (e) {
+            // Continue if parsing fails
+          }
+        });
+        
+        return true;
+      } catch (error) {
+        return false;
+      }
+    });
+    
+    // Method 3: Try YouTube's native dark mode toggle
+    await page.waitForTimeout(500); // Give localStorage time to take effect
+    
+    // Look for the appearance/theme button in the top bar
+    const themeSelectors = [
+      'button[aria-label*="Switch to dark theme"]',
       'button[aria-label*="Dark theme"]',
-      'button[aria-label*="dark theme"]',
       'button[title*="Dark theme"]',
-      'button[title*="dark theme"]',
-      '#avatar-btn', // Settings menu
-      'ytd-topbar-menu-button-renderer button'
+      'button[data-tooltip-text*="Dark theme"]',
+      '#button[aria-label*="Appearance"]'
     ];
 
-    // First try direct dark mode toggle
-    for (const selector of darkModeSelectors.slice(0, 4)) {
+    for (const selector of themeSelectors) {
       try {
         const button = page.locator(selector).first();
         if (await button.isVisible({ timeout: 1000 })) {
           await button.click();
-          logger.debug('✅ Dark mode toggled via button');
+          logger.debug('✅ Dark mode toggled via native YouTube button');
           await page.waitForTimeout(500);
           return;
         }
@@ -597,66 +642,88 @@ async function enableDarkMode(page: Page, logger: Logger): Promise<void> {
       }
     }
 
-    // Method 2: Try accessing through settings menu
+    // Method 4: Try accessing through user menu (three dots or avatar)
     try {
-      // Click on user avatar/settings
-      const avatarButton = page.locator('#avatar-btn, ytd-topbar-menu-button-renderer button').first();
-      if (await avatarButton.isVisible({ timeout: 2000 })) {
-        await avatarButton.click();
-        await page.waitForTimeout(500);
-        
-        // Look for dark theme option in dropdown
-        const darkThemeOption = page.locator('text="Dark theme", text="Dark mode"').first();
-        if (await darkThemeOption.isVisible({ timeout: 1000 })) {
-          await darkThemeOption.click();
-          logger.debug('✅ Dark mode enabled via settings menu');
-          await page.waitForTimeout(500);
-          return;
+      const menuTriggers = [
+        'button[aria-label*="Settings"]:visible',
+        'button[aria-label*="Menu"]:visible',
+        '#avatar-btn:visible',
+        'ytd-topbar-menu-button-renderer button:visible'
+      ];
+      
+      for (const trigger of menuTriggers) {
+        try {
+          const menuButton = page.locator(trigger).first();
+          if (await menuButton.isVisible({ timeout: 1000 })) {
+            await menuButton.click();
+            await page.waitForTimeout(500);
+            
+            // Look for appearance/theme options
+            const themeOptions = [
+              'text="Appearance: Dark"',
+              'text="Dark theme"',
+              'text="Appearance"',
+              '[role="menuitem"]:has-text("Appearance")',
+              '[role="menuitem"]:has-text("Dark")'
+            ];
+            
+            for (const option of themeOptions) {
+              try {
+                const themeOption = page.locator(option).first();
+                if (await themeOption.isVisible({ timeout: 1000 })) {
+                  await themeOption.click();
+                  logger.debug('✅ Dark mode enabled via settings menu');
+                  await page.waitForTimeout(500);
+                  return;
+                }
+              } catch {
+                // Continue
+              }
+            }
+            
+            // Close menu if theme option not found
+            await page.keyboard.press('Escape');
+            break;
+          }
+        } catch {
+          // Continue to next trigger
         }
-        
-        // Close menu if dark mode not found
-        await page.keyboard.press('Escape');
       }
     } catch (error) {
       logger.debug(`⚠ Settings menu approach failed: ${error}`);
     }
 
-    // Method 3: Inject CSS for dark mode if toggle not found
-    logger.debug('🔧 Applying dark mode via CSS injection...');
-    await page.addStyleTag({
-      content: `
-        /* Dark mode CSS override */
-        html[dark], [dark] {
-          --yt-spec-base-background: #0f0f0f !important;
-          --yt-spec-raised-background: #212121 !important;
-          --yt-spec-menu-background: #282828 !important;
-          --yt-spec-inverted-background: #f1f1f1 !important;
-          --yt-spec-outline: #303030 !important;
-          --yt-spec-text-primary: #f1f1f1 !important;
-          --yt-spec-text-secondary: #aaaaaa !important;
-          --yt-spec-text-disabled: #717171 !important;
+    // Method 5: Force dark mode via JavaScript (native YouTube methods)
+    const darkModeApplied = await page.evaluate(() => {
+      try {
+        // Try to trigger YouTube's internal dark mode
+        const html = document.documentElement;
+        html.setAttribute('dark', '');
+        html.setAttribute('data-theme', 'dark');
+        
+        // Try to find and trigger YouTube's theme controller
+        const ytdApp = document.querySelector('ytd-app');
+        if (ytdApp) {
+          ytdApp.setAttribute('dark', '');
         }
         
-        /* Force dark background */
-        body, #page-manager, ytd-app, #content {
-          background-color: #0f0f0f !important;
-          color: #f1f1f1 !important;
-        }
+        // Dispatch a theme change event
+        const themeEvent = new CustomEvent('yt-theme-change', {
+          detail: { theme: 'dark' }
+        });
+        document.dispatchEvent(themeEvent);
         
-        /* Dark mode for various elements */
-        ytd-watch-flexy, 
-        #primary,
-        #secondary,
-        ytd-video-primary-info-renderer,
-        ytd-video-secondary-info-renderer,
-        ytd-comments {
-          background-color: #0f0f0f !important;
-          color: #f1f1f1 !important;
-        }
-      `
+        return true;
+      } catch (error) {
+        return false;
+      }
     });
     
-    logger.debug('✅ Dark mode applied via CSS');
+    if (darkModeApplied) {
+      logger.debug('✅ Dark mode applied via JavaScript theme controller');
+    } else {
+      logger.debug('⚠ Could not enable dark mode via native methods');
+    }
     
   } catch (error) {
     logger.debug(`⚠ Could not enable dark mode: ${error}`);
