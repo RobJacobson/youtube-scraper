@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import { scrapeYouTubeChannel } from './scraper/YouTubeScraper';
+import { scrapeYouTubeChannel } from './scraper/scrapeYouTubeChannel';
 import { Config } from './types/Config';
 import { setupDirectories } from './utils/fileSystem';
 
