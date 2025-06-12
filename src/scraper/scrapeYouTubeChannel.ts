@@ -11,8 +11,8 @@ import { getVideoUrls } from "./getVideoUrls";
 import { scrapeVideos } from "./scrapeVideos";
 
 // Browser configuration constants
-const VIEWPORT_WIDTH = 1024;
-const VIEWPORT_HEIGHT = 720;
+const VIEWPORT_WIDTH = 1920;
+const VIEWPORT_HEIGHT = 1080;
 const DEVICE_SCALE_FACTOR = 1;
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";

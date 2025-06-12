@@ -17,11 +17,12 @@ import {
   expandDescriptionAndComments,
   takeScreenshot,
 } from "./helpers/contentHelpers";
+import { extractPageMetadata } from "./helpers/metadataExtractor";
 
 // Navigation and timeout constants
 const PAGE_NAVIGATION_TIMEOUT = 30000;
-const TITLE_SELECTOR_TIMEOUT = 10000;
-const FALLBACK_TITLE_TIMEOUT = 3000;
+const TITLE_SELECTOR_TIMEOUT = 5000;
+const FALLBACK_TITLE_TIMEOUT = 2000;
 const INITIAL_PAGE_DELAY = 1000;
 const PAGE_SETUP_DELAY = 1000;
 
@@ -78,6 +79,9 @@ async function scrapeVideoMetadata(
     // Single page setup - combine all tasks
     await setupPage(page, config, logger);
 
+    // Expand content and extract metadata
+    await expandDescriptionAndComments(page, logger);
+
     // Wait for content to load
     try {
       await page.waitForSelector("h1:not([hidden])", {
@@ -88,67 +92,8 @@ async function scrapeVideoMetadata(
       await page.waitForSelector("title", { timeout: FALLBACK_TITLE_TIMEOUT });
     }
 
-    // Expand content and extract metadata
-    await expandDescriptionAndComments(page, logger);
-
-    // Extract metadata
-    const metadata = await page.evaluate((videoUrl) => {
-      const getTextContent = (selector: string): string => {
-        const element = document.querySelector(selector);
-        return element?.textContent?.trim() || "";
-      };
-
-      const getAttribute = (selector: string, attr: string): string => {
-        const element = document.querySelector(selector);
-        return element?.getAttribute(attr) || "";
-      };
-
-      return {
-        url: videoUrl,
-        title:
-          getTextContent('h1[data-e2e="video-title"]') ||
-          getTextContent("h1.ytd-video-primary-info-renderer") ||
-          getTextContent("h1.title") ||
-          getTextContent("h1"),
-        description:
-          getTextContent("#description-text") ||
-          getTextContent("#description") ||
-          getTextContent("#description-inline-expander") ||
-          getTextContent(".description") ||
-          getTextContent('[data-e2e="video-description"]') ||
-          getTextContent("#watch-description-text"),
-        author:
-          getTextContent("#owner-name a") ||
-          getTextContent(".channel-name") ||
-          getTextContent('[data-e2e="video-author"]'),
-        channelUrl:
-          getAttribute("#owner-name a", "href") ||
-          getAttribute(".channel-name a", "href"),
-        viewCount:
-          getTextContent("#info-text") ||
-          getTextContent(".view-count") ||
-          getTextContent('[data-e2e="video-view-count"]'),
-        likeCount:
-          getTextContent('button[aria-label*="like"] span[role="text"]') ||
-          getTextContent(".like-count"),
-        publishedDate:
-          getTextContent("#info-text") ||
-          getTextContent(".date") ||
-          getTextContent('[data-e2e="video-publish-date"]'),
-        duration:
-          getTextContent(".ytp-time-duration") ||
-          getAttribute('meta[itemprop="duration"]', "content"),
-        thumbnailUrl:
-          getAttribute('link[itemprop="thumbnailUrl"]', "href") ||
-          getAttribute('meta[property="og:image"]', "content"),
-        category:
-          getAttribute('meta[itemprop="genre"]', "content") ||
-          getAttribute('meta[property="og:video:genre"]', "content"),
-        uploadDate:
-          getAttribute('meta[itemprop="uploadDate"]', "content") ||
-          getAttribute('meta[property="og:video:release_date"]', "content"),
-      };
-    }, url);
+    // Extract metadata using the refactored function
+    const metadata = await extractPageMetadata(page, url);
 
     // Extract video ID from URL
     const videoId = extractVideoId(url);
