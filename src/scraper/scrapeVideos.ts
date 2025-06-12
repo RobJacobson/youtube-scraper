@@ -2,7 +2,8 @@ import { Page } from "playwright";
 import { VideoMetadata, FailedVideo } from "../types/VideoMetadata";
 import { Config } from "../types/Config";
 import { ScrapingContext } from "./scrapeYouTubeChannel";
-import { getLogger } from "../utils/globalLogger";
+import { getLogger, resetTime } from "../utils/globalLogger";
+import inquirer from "inquirer";
 import {
   dismissPopups,
   pauseVideo,
@@ -19,7 +20,6 @@ const PAGE_NAVIGATION_TIMEOUT = 30000;
 const TITLE_SELECTOR_TIMEOUT = 5000;
 const FALLBACK_TITLE_TIMEOUT = 2000;
 const INITIAL_PAGE_DELAY = 5000;
-const PAGE_SETUP_DELAY = 1000;
 
 export async function scrapeVideos(
   videoUrls: string[],
@@ -29,17 +29,50 @@ export async function scrapeVideos(
   const logger = getLogger();
   const success: VideoMetadata[] = [];
   const failed: FailedVideo[] = [];
+  const openPages: Page[] = []; // Track open pages in interactive mode
 
   logger.info(`📊 Starting to scrape ${videoUrls.length} videos...`);
 
+  if (config.interactive) {
+    logger.info(
+      "🎮 Interactive mode enabled - you'll be prompted after each page"
+    );
+  }
+
   for (let i = 0; i < videoUrls.length; i++) {
     const url = videoUrls[i];
+
+    // Reset the clock before processing each video
+    resetTime();
+
     logger.info(`🎥 Processing video ${i + 1}/${videoUrls.length}: ${url}`);
 
     try {
-      const metadata = await scrapeVideoMetadata(url, scrapingContext);
+      const { metadata, page } = await scrapeVideoMetadataWithPage(
+        url,
+        scrapingContext
+      );
       success.push(metadata);
       logger.success(`✅ Successfully scraped: ${metadata.title}`);
+
+      // Track page in interactive mode
+      if (config.interactive && page) {
+        openPages.push(page);
+      }
+
+      // Interactive mode: prompt user after successful scrape
+      if (config.interactive) {
+        const shouldContinue = await promptUserAction();
+        if (!shouldContinue) {
+          logger.info("🛑 User requested exit - stopping scraper...");
+          break;
+        }
+        // Close the page after user prompt
+        if (page) {
+          await page.close();
+          logger.debug("📄 Page closed after user prompt");
+        }
+      }
     } catch (error) {
       const failedVideo: FailedVideo = {
         url,
@@ -48,15 +81,92 @@ export async function scrapeVideos(
       };
       failed.push(failedVideo);
       logger.error(`❌ Failed to scrape: ${url} - ${failedVideo.error}`);
+
+      // Interactive mode: prompt user even after failures
+      if (config.interactive) {
+        const shouldContinue = await promptUserAction();
+        if (!shouldContinue) {
+          logger.info("🛑 User requested exit - stopping scraper...");
+          break;
+        }
+      }
     }
 
-    // Respectful delay between requests
-    if (i < videoUrls.length - 1) {
+    // Respectful delay between requests (skip in interactive mode as user controls pacing)
+    if (i < videoUrls.length - 1 && !config.interactive) {
       await backoff.delay();
     }
   }
 
+  // Clean up any remaining open pages in interactive mode
+  if (config.interactive && openPages.length > 0) {
+    logger.debug(`🧹 Closing ${openPages.length} remaining pages...`);
+    await Promise.all(openPages.map((page) => page.close().catch(() => {})));
+  }
+
   return { success, failed };
+}
+
+// Modified function to return both metadata and page for interactive mode
+async function scrapeVideoMetadataWithPage(
+  url: string,
+  scrapingContext: ScrapingContext
+): Promise<{ metadata: VideoMetadata; page: Page | null }> {
+  const { config } = scrapingContext;
+
+  if (config.interactive) {
+    // In interactive mode, return page for inspection
+    const metadata = await scrapeVideoMetadata(url, scrapingContext);
+    // Get the last opened page from context (this is a bit hacky but works)
+    const pages = scrapingContext.context.pages();
+    const page = pages[pages.length - 1];
+    return { metadata, page };
+  } else {
+    // Normal mode - page is closed in scrapeVideoMetadata
+    const metadata = await scrapeVideoMetadata(url, scrapingContext);
+    return { metadata, page: null };
+  }
+}
+
+// Interactive mode user prompt
+async function promptUserAction(): Promise<boolean> {
+  const { action } = await inquirer.prompt([
+    {
+      type: "input",
+      name: "action",
+      message: "Press 'n' for next video, 'q' to quit:",
+      validate: (input: string) => {
+        const choice = input.toLowerCase().trim();
+        return (
+          choice === "n" ||
+          choice === "q" ||
+          "Please enter 'n' for next or 'q' to quit"
+        );
+      },
+    },
+  ]);
+
+  return action.toLowerCase().trim() !== "q";
+}
+
+// Helper function to log scraping duration
+function logScrapingDuration(
+  startTime: number,
+  titleOrUrl: string,
+  error?: string
+): void {
+  const logger = getLogger();
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  if (!error) {
+    logger.info(`⏱️  Page scraped in ${duration}s: ${titleOrUrl}`);
+  } else {
+    logger.error(
+      `❌ Page scraping failed after ${duration}s: ${titleOrUrl}${
+        error ? ` - ${error}` : ""
+      }`
+    );
+  }
 }
 
 async function scrapeVideoMetadata(
@@ -64,6 +174,11 @@ async function scrapeVideoMetadata(
   scrapingContext: ScrapingContext
 ): Promise<VideoMetadata> {
   const { context, config } = scrapingContext;
+  const logger = getLogger();
+  const startTime = Date.now();
+
+  logger.debug(`🔍 Starting page scrape: ${url}`);
+
   const page = await context.newPage();
 
   try {
@@ -95,12 +210,31 @@ async function scrapeVideoMetadata(
         completeMetadata.id,
         config
       );
+
+      logScrapingDuration(startTime, completeMetadata.title || "Unknown Title");
+
       return { ...completeMetadata, screenshot_path: screenshotPath };
     }
 
+    logScrapingDuration(startTime, completeMetadata.title || "Unknown Title");
+
     return completeMetadata;
+  } catch (error) {
+    logScrapingDuration(
+      startTime,
+      url,
+      error instanceof Error ? error.message : String(error)
+    );
+    throw error;
   } finally {
-    await page.close();
+    // In interactive mode, keep the page open for user inspection
+    if (!config.interactive) {
+      await page.close();
+    } else {
+      logger.info(
+        "🎮 Page kept open for inspection - will close after user prompt"
+      );
+    }
   }
 }
 
@@ -108,27 +242,25 @@ async function scrapeVideoMetadata(
 async function setupPage(page: Page, config: Config): Promise<void> {
   // Wait for initial load
   await page.waitForLoadState("networkidle");
+  if (config.hideSuggestedVideos) {
+    await hideSuggestedContent(page);
+  }
   await page.waitForTimeout(INITIAL_PAGE_DELAY);
   console.log("Initial page delay complete");
 
-  // Setup all features at once with Promise.allSettled
-  const setupTasks = [pauseVideo(page), dismissPopups(page)];
+  await pauseVideo(page);
+  await dismissPopups(page);
+  await expandDescription(page);
 
-  if (config.useDarkMode) {
-    setupTasks.push(enableDarkMode(page));
-  }
+  // if (config.useDarkMode) {
+  //   await enableDarkMode(page);
+  // }
 
-  if (config.useTheaterMode) {
-    setupTasks.push(enableTheaterMode(page));
-  }
+  // if (config.useTheaterMode) {
+  //   await enableTheaterMode(page);
+  //   await page.waitForTimeout(1000);
+  //   await pauseVideo(page);
+  // }
 
-  if (config.hideSuggestedVideos) {
-    setupTasks.push(hideSuggestedContent(page));
-  }
-
-  // Expand description for complete metadata extraction
-  setupTasks.push(expandDescription(page));
-
-  await Promise.allSettled(setupTasks);
   console.log("Setup tasks complete");
 }

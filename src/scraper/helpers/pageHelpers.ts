@@ -3,14 +3,9 @@ import { getLogger } from "../../utils/globalLogger";
 
 // Timeout constants
 const CONSENT_DIALOG_TIMEOUT = 5000;
-const CONSENT_DIALOG_DELAY = 1000;
-const POPUP_VISIBILITY_TIMEOUT = 500;
 const VIDEO_SELECTOR_TIMEOUT = 5000;
-const THEATER_MODE_DELAY = 200;
 const SCROLL_ITERATIONS = 5;
-const SCROLL_DELAY = 1500;
-const EXPAND_BUTTON_DELAY = 1000;
-const MAX_EXPAND_ATTEMPTS = 3;
+const SCROLL_DELAY = 1000;
 
 // Generic helper for parallel button detection and clicking
 async function findAndClickButton(
@@ -22,166 +17,99 @@ async function findAndClickButton(
     successMessage?: string;
   }
 ): Promise<boolean> {
-  const {
-    checkEnabled = false,
-    timeout = 200,
-    successMessage = "Button clicked",
-  } = options;
+  const { checkEnabled = false, successMessage = "Button clicked" } = options;
   const logger = getLogger();
 
-  try {
-    logger.debug(
-      `Checking ${selectors.length} selectors with timeout ${timeout}ms`
-    );
+  // Process all selectors in parallel - each handles check and click
+  const results = await Promise.allSettled(
+    selectors.map(async (selector) => {
+      const locator = page.locator(selector).first();
+      const visible = await locator.isVisible({ timeout: 500 });
 
-    // Check all selectors in parallel and cache locator objects
-    const results = await Promise.allSettled(
-      selectors.map((selector) => {
-        const locator = page.locator(selector).first();
+      if (visible) {
+        const enabled = checkEnabled ? await locator.isEnabled() : true;
 
-        if (checkEnabled) {
-          return Promise.all([
-            locator.isVisible({ timeout }),
-            locator.isEnabled(),
-          ]).then(([visible, enabled]) => ({
-            locator,
-            visible,
-            enabled,
-            selector,
-          }));
-        } else {
-          return locator
-            .isVisible({ timeout })
-            .then((visible) => ({ locator, visible, enabled: true, selector }));
-        }
-      })
-    );
-
-    // Debug results
-    let foundCount = 0;
-    let visibleCount = 0;
-
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      if (result.status === "fulfilled") {
-        foundCount++;
-        if (result.value.visible) {
-          visibleCount++;
-          logger.debug(`Found visible button: ${result.value.selector}`);
-        }
-      } else {
-        logger.debug(`Selector failed: ${selectors[i]} - ${result.reason}`);
-      }
-    }
-
-    logger.debug(
-      `Found ${foundCount}/${selectors.length} selectors, ${visibleCount} visible`
-    );
-
-    // Find first visible (and enabled) button and click it
-    for (const result of results) {
-      if (
-        result.status === "fulfilled" &&
-        result.value.visible &&
-        result.value.enabled
-      ) {
-        try {
-          await result.value.locator.click();
-          logger.info(successMessage);
+        if (enabled) {
+          await locator.click();
           return true;
-        } catch (error) {
-          logger.debug(`Click failed on ${result.value.selector}: ${error}`);
-          // Continue if click fails
         }
       }
-    }
-  } catch (error) {
-    logger.error(`Error in findAndClickButton: ${error}`);
+      return false;
+    })
+  );
+
+  const clicked = results.some(
+    (result) => result.status === "fulfilled" && result.value === true
+  );
+
+  if (clicked) {
+    logger.info(successMessage);
+    await page.waitForTimeout(500);
   }
 
-  return false;
+  return clicked;
 }
 
 export async function handleConsentDialog(page: Page): Promise<void> {
-  try {
-    const consentButton = page
-      .locator('button:has-text("Accept all"), button:has-text("Reject all")')
-      .first();
-    if (await consentButton.isVisible({ timeout: CONSENT_DIALOG_TIMEOUT })) {
-      await consentButton.click();
-      await page.waitForTimeout(CONSENT_DIALOG_DELAY);
-    }
-  } catch {
-    // Ignore if consent dialog not found
-  }
+  const consentSelectors = [
+    'button:has-text("Accept all")',
+    'button:has-text("Reject all")',
+  ];
+
+  await findAndClickButton(page, consentSelectors, {
+    successMessage: "✅ Consent dialog handled",
+  });
 }
 
 export async function dismissPopups(page: Page): Promise<void> {
-  const logger = getLogger();
-  logger.info("🚫 Starting popup dismissal...");
+  const popupSelectors = ["button[aria-label='Dismiss']"];
 
-  const popupSelectors = [
-    'button[aria-label*="Close"]',
-    'button:has-text("×")',
-    'button:has-text("No thanks")',
-    'button:has-text("Skip")',
-    'button:has-text("Not now")',
-    'button:has-text("Dismiss")',
-  ];
-
-  const dismissed = await findAndClickButton(page, popupSelectors, {
-    checkEnabled: false,
-    timeout: 200,
+  await findAndClickButton(page, popupSelectors, {
     successMessage: "✅ Popup dismissed",
   });
-
-  if (!dismissed) {
-    logger.info("ℹ No popups found to dismiss");
-  }
 }
 
 export async function pauseVideo(page: Page): Promise<void> {
-  const logger = getLogger();
   try {
     await page.waitForSelector("video", { timeout: VIDEO_SELECTOR_TIMEOUT });
-
-    // Simple JavaScript pause - most reliable method
     await page.evaluate(() => {
       const video = document.querySelector("video");
       if (video && !video.paused) {
         video.pause();
       }
     });
-
-    logger.debug("⏸️ Video paused");
+    getLogger().debug("⏸️ Video paused");
   } catch {
     // Video might not be present or pausable
   }
 }
+export async function expandDescription(page: Page): Promise<void> {
+  const selectors = ["tp-yt-paper-button#expand"];
+
+  await findAndClickButton(page, selectors, {
+    checkEnabled: true,
+    successMessage: "✅ Description expanded",
+  });
+}
 
 export async function enableTheaterMode(page: Page): Promise<void> {
-  const logger = getLogger();
-  try {
-    await page.keyboard.press("t");
-    await page.waitForTimeout(THEATER_MODE_DELAY);
-    logger.debug("🎭 Theater mode enabled");
-  } catch {
-    // Theater mode might not be available
-  }
+  const theaterSelectors = [".ytp-size-button"];
+
+  await findAndClickButton(page, theaterSelectors, {
+    successMessage: "🎭 Theater mode enabled",
+  });
 }
 
 export async function enableDarkMode(page: Page): Promise<void> {
-  const logger = getLogger();
   try {
     await page.emulateMedia({ colorScheme: "dark" });
-    logger.debug("🌙 Dark mode enabled");
+    getLogger().debug("🌙 Dark mode enabled");
   } catch {
     // Dark mode might not be supported
   }
 }
 
 export async function hideSuggestedContent(page: Page): Promise<void> {
-  const logger = getLogger();
   try {
     await page.addStyleTag({
       content: `
@@ -193,7 +121,7 @@ export async function hideSuggestedContent(page: Page): Promise<void> {
         }
       `,
     });
-    logger.debug("🚫 Suggested content hidden");
+    getLogger().debug("🚫 Suggested content hidden");
   } catch {
     // CSS injection might fail
   }
@@ -215,24 +143,4 @@ export async function scrollToLoadVideos(page: Page): Promise<void> {
     });
     await page.waitForTimeout(SCROLL_DELAY);
   }
-}
-
-export async function expandDescription(page: Page): Promise<void> {
-  const logger = getLogger();
-  logger.debug("📝 Attempting to expand description...");
-
-  const selectors = [
-    "tp-yt-paper-button#expand",
-    "#expand.ytd-text-inline-expander",
-    'button[aria-label*="Show more"]',
-    'button:has-text("Show more")',
-    'button:has-text("...more")',
-    'button:has-text("Read more")',
-  ];
-
-  await findAndClickButton(page, selectors, {
-    checkEnabled: true,
-    timeout: 200,
-    successMessage: "✅ Clicking expand button",
-  });
 }

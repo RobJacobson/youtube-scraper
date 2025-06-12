@@ -2,6 +2,25 @@ import { Page } from "playwright";
 import { VideoMetadata } from "../../types/VideoMetadata";
 
 /**
+ * Trims and cleans up video descriptions
+ * @param description - Raw description text
+ * @returns Cleaned description
+ */
+function trimDescription(description: string): string {
+  if (!description) return "";
+
+  // Remove "…...more\n" and everything that follows
+  const moreIndex = description.indexOf("…...more\n");
+  let trimmed =
+    moreIndex !== -1 ? description.substring(0, moreIndex) : description;
+
+  // Convert "\n\n" to "\n"
+  trimmed = trimmed.replace(/\n\n/g, "\n");
+
+  return trimmed.trim();
+}
+
+/**
  * Extracts complete metadata from the YouTube video page
  * @param page - Playwright page instance
  * @param url - Video URL
@@ -79,10 +98,11 @@ export async function extractPageMetadata(
     extractLanguage(page),
   ]);
 
-  // Return complete metadata object
+  // Return complete metadata object with cleaned description
   return {
     id: videoId,
     ...basicMetadata,
+    description: trimDescription(basicMetadata.description),
     tags,
     language,
     scraped_at: new Date().toISOString(),

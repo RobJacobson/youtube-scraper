@@ -23,7 +23,12 @@ const program = new Command()
   .option("--verbose", "Enable verbose logging", false)
   .option("--dark-mode", "Enable dark mode for YouTube pages", false)
   .option("--theater-mode", "Enable theater mode for video pages", false)
-  .option("--hide-suggested", "Hide suggested videos and distractions", false);
+  .option("--hide-suggested", "Hide suggested videos and distractions", false)
+  .option(
+    "-i, --interactive",
+    "Interactive mode - pause after each screenshot",
+    false
+  );
 
 async function main() {
   program.parse();
@@ -45,6 +50,7 @@ async function main() {
     useDarkMode: options.darkMode,
     useTheaterMode: options.theaterMode,
     hideSuggestedVideos: options.hideSuggested,
+    interactive: options.interactive,
     outputDir: `/media/rob/D/youtube/metadata/${extractChannelName(
       channelUrl
     )}`,

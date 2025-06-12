@@ -11,4 +11,5 @@ export interface Config {
   useDarkMode: boolean;
   useTheaterMode: boolean;
   hideSuggestedVideos: boolean;
+  interactive: boolean;
 }

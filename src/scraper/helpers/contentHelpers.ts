@@ -5,7 +5,7 @@ import { getLogger } from "../../utils/globalLogger";
 
 // Constants for content extraction
 const VIDEO_ID_REGEX_GROUP = 1;
-const SCREENSHOT_SCROLL_DELAY = 1000;
+const SCREENSHOT_SCROLL_DELAY = 5000;
 
 export function extractVideoId(url: string): string {
   const match = url.match(/[?&]v=([^&#]*)/);
@@ -35,19 +35,13 @@ export async function takeScreenshot(
   const logger = getLogger();
   logger.debug("📸 Taking screenshot...");
 
-  // Simplified - just scroll to top and take screenshot
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(SCREENSHOT_SCROLL_DELAY);
-
-  const filename = `${videoId}_${format(
-    new Date(),
-    "yyyy-MM-dd_HH-mm-ss"
-  )}.png`;
+  const filename = `${format(new Date(), "yyyy-MM-dd")} ${videoId}.png`;
   const screenshotPath = `${config.outputDir}/screenshots/${filename}`;
 
+  await page.waitForTimeout(SCREENSHOT_SCROLL_DELAY);
   await page.screenshot({
     path: screenshotPath,
-    fullPage: true,
+    fullPage: false,
     type: "png",
   });
 
