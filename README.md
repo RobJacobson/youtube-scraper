@@ -182,7 +182,7 @@ bun run dev
 - **Browser Automation**: Playwright (cross-browser testing framework)
 - **CLI**: Commander.js (command-line interface)
 - **UI**: Inquirer.js (interactive prompts)
-- **Utilities**: chalk, date-fns, fs-extra
+- **Utilities**: chalk, date-fns, Node.js built-in fs APIs
 
 ## ⚡ Performance & Rate Limiting
 

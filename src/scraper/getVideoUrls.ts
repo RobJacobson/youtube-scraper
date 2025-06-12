@@ -13,17 +13,12 @@ export async function getVideoUrls(scrapingContext: ScrapingContext): Promise<st
       timeout: 30000 
     });
 
-    // Handle consent dialog if present
+    // Handle consent and popups once
     await handleConsentDialog(page);
-    
-    // Dismiss any popups on the channel page
     await dismissPopups(page, logger);
 
     // Scroll to load more videos
     await scrollToLoadVideos(page, logger);
-    
-    // Dismiss popups again after scrolling (new content may trigger popups)
-    await dismissPopups(page, logger);
 
     // Extract video URLs
     const videoUrls = await page.evaluate((configData) => {

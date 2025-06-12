@@ -1,4 +1,7 @@
+import { Page } from 'playwright';
 import { VideoMetadata, FailedVideo } from '../types/VideoMetadata';
+import { Config } from '../types/Config';
+import { Logger } from '../utils/Logger';
 import { ScrapingContext } from './scrapeYouTubeChannel';
 import { dismissPopups, pauseVideo, enableDarkMode, enableTheaterMode, hideSuggestedContent } from './helpers/pageHelpers';
 import { extractVideoId, extractTags, extractLanguage, expandDescriptionAndComments, takeScreenshot } from './helpers/contentHelpers';
@@ -51,44 +54,17 @@ async function scrapeVideoMetadata(url: string, scrapingContext: ScrapingContext
       timeout: 30000 
     });
 
-    // Wait for video to load with minimal delay
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    // Single page setup - combine all tasks
+    await setupPage(page, config, logger);
     
-    // Immediately dismiss any popups that appear on page load
-    await dismissPopups(page, logger);
-    
-    // Setup page features based on configuration
-    const setupTasks = [
-      pauseVideo(page, logger)
-    ];
-
-    // Add optional features based on config
-    if (config.useDarkMode) {
-      setupTasks.push(enableDarkMode(page, logger));
-    }
-    
-    if (config.useTheaterMode) {
-      setupTasks.push(enableTheaterMode(page, logger));
-    }
-    
-    if (config.hideSuggestedVideos) {
-      setupTasks.push(hideSuggestedContent(page, logger));
-    }
-
-    await Promise.allSettled(setupTasks);
-    
-    // Dismiss popups again after page setup
-    await dismissPopups(page, logger);
-    
-    // Wait for title to be visible
+    // Wait for content to load
     try {
       await page.waitForSelector('h1:not([hidden])', { state: 'visible', timeout: 10000 });
     } catch {
       await page.waitForSelector('title', { timeout: 3000 });
     }
 
-    // Expand content after theater mode is enabled
+    // Expand content and extract metadata
     await expandDescriptionAndComments(page, logger);
 
     // Extract metadata
@@ -141,4 +117,31 @@ async function scrapeVideoMetadata(url: string, scrapingContext: ScrapingContext
   } finally {
     await page.close();
   }
+}
+
+// Simplified page setup - one function, one popup dismissal
+async function setupPage(page: Page, config: Config, logger: Logger): Promise<void> {
+  // Wait for initial load
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1000);
+  
+  // Single popup dismissal at the start
+  await dismissPopups(page, logger);
+  
+  // Setup all features at once with Promise.allSettled
+  const setupTasks = [pauseVideo(page, logger)];
+
+  if (config.useDarkMode) {
+    setupTasks.push(enableDarkMode(page, logger));
+  }
+  
+  if (config.useTheaterMode) {
+    setupTasks.push(enableTheaterMode(page, logger));
+  }
+  
+  if (config.hideSuggestedVideos) {
+    setupTasks.push(hideSuggestedContent(page, logger));
+  }
+
+  await Promise.allSettled(setupTasks);
 } 

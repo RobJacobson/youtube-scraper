@@ -8,19 +8,11 @@ export class Logger {
   }
 
   success(message: string): void {
-    if (this.verbose) {
-      console.log(chalk.green(`✅ ${message}`));
-    }
+    console.log(chalk.green(`✅ ${message}`));
   }
 
   error(message: string): void {
     console.error(chalk.red(`❌ ${message}`));
-  }
-
-  warn(message: string): void {
-    if (this.verbose) {
-      console.warn(chalk.yellow(`⚠ ${message}`));
-    }
   }
 
   debug(message: string): void {
