@@ -8,4 +8,7 @@ export interface Config {
   skipScreenshots: boolean;
   verbose: boolean;
   outputDir: string;
+  useDarkMode: boolean;
+  useTheaterMode: boolean;
+  hideSuggestedVideos: boolean;
 } 

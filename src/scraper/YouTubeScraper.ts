@@ -64,8 +64,8 @@ async function initializeScraping(config: Config, logger: Logger): Promise<Scrap
   });
 
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 1.25, // 125% zoom
+    viewport: { width: 1024, height: 720 },
+    deviceScaleFactor: 1, // 125% zoom
     userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
   });
 
@@ -94,6 +94,9 @@ async function getVideoUrls(scrapingContext: ScrapingContext): Promise<string[]>
 
     // Scroll to load more videos
     await scrollToLoadVideos(page, logger);
+    
+    // Dismiss popups again after scrolling (new content may trigger popups)
+    await dismissPopups(page, logger);
 
     // Extract video URLs
     const videoUrls = await page.evaluate((configData) => {
@@ -202,13 +205,31 @@ async function scrapeVideoMetadata(url: string, scrapingContext: ScrapingContext
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000); // Reduced from 3000ms
     
-    // Pause video immediately and setup page in parallel
-    await Promise.allSettled([
-      pauseVideo(page, logger),
-      dismissPopups(page, logger),
-      enableTheaterMode(page, logger),
-      // hideSuggestedContent(page, logger) // Disabled - keeping original page appearance
-    ]);
+    // Immediately dismiss any popups that appear on page load
+    await dismissPopups(page, logger);
+    
+    // Setup page features based on configuration
+    const setupTasks = [
+      pauseVideo(page, logger)
+    ];
+
+    // Add optional features based on config
+    if (config.useDarkMode) {
+      setupTasks.push(enableDarkMode(page, logger));
+    }
+    
+    if (config.useTheaterMode) {
+      setupTasks.push(enableTheaterMode(page, logger));
+    }
+    
+    if (config.hideSuggestedVideos) {
+      setupTasks.push(hideSuggestedContent(page, logger));
+    }
+
+    await Promise.allSettled(setupTasks);
+    
+    // Dismiss popups again after page setup
+    await dismissPopups(page, logger);
     
     // Wait for title to be visible
     try {
@@ -279,31 +300,161 @@ function extractVideoId(url: string): string {
 
 async function dismissPopups(page: Page, logger: Logger): Promise<void> {
   try {
-    // Ultra-fast popup check - only most common ones
-    const quickSelectors = [
+    logger.debug('🚫 Automatically dismissing popups...');
+    
+    // Comprehensive popup selectors for YouTube
+    const popupSelectors = [
+      // Generic close buttons
       'button[aria-label*="Close"]',
+      'button[aria-label*="close"]',
+      'button[title*="Close"]',
+      'button[title*="close"]',
       'button:has-text("×")',
-      'button:has-text("Close")'
+      'button:has-text("Close")',
+      'button:has-text("Dismiss")',
+      'button:has-text("Got it")',
+      'button:has-text("OK")',
+      'button:has-text("No thanks")',
+      'button:has-text("Skip")',
+      'button:has-text("Later")',
+      'button:has-text("Not now")',
+      
+      // YouTube-specific popups
+      'button[aria-label*="No thanks"]',
+      'button[aria-label*="Skip"]',
+      'button[aria-label*="Skip trial"]',
+      'button[aria-label*="Maybe later"]',
+      'button[aria-label*="Not now"]',
+      'button[aria-label*="Dismiss"]',
+      
+      // YouTube Premium prompts
+      'ytd-mealbar-promo-renderer button',
+      'ytd-popup-container button:has-text("No thanks")',
+      'ytd-popup-container button:has-text("Skip")',
+      'ytd-popup-container button:has-text("Not now")',
+      
+      // Notification and subscription prompts
+      'button[aria-label*="Turn on notifications"]',
+      'button:has-text("Turn on")',
+      'button:has-text("Subscribe")',
+      'button:has-text("Enable")',
+      
+      // Overlay and modal close buttons
+      '.ytd-popup-container button',
+      '.overlay-close-button',
+      '.close-button',
+      '.modal-close',
+      
+      // Cookie consent (if any)
+      'button:has-text("Accept")',
+      'button:has-text("Accept all")',
+      'button:has-text("Reject")',
+      'button:has-text("Reject all")',
+      
+      // Survey and feedback popups
+      'button:has-text("No, thanks")',
+      'button:has-text("Maybe later")',
+      'button[aria-label*="feedback"]',
+      
+      // Age verification and content warnings
+      'button:has-text("I understand")',
+      'button:has-text("Continue")',
+      'button:has-text("Proceed")',
+      
+      // Generic modal/dialog closes
+      '[role="dialog"] button',
+      '[role="alertdialog"] button',
+      '.ytd-button-renderer button'
     ];
 
-    for (const selector of quickSelectors) {
-      try {
-        const button = page.locator(selector).first();
-        if (await button.isVisible({ timeout: 100 })) {
-          await button.click();
-          logger.debug('✅ Popup dismissed');
-          return; // Exit immediately after first dismissal
+    let dismissedCount = 0;
+    
+    // Try to dismiss multiple popups (some pages have multiple)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let foundPopup = false;
+      
+      for (const selector of popupSelectors) {
+        try {
+          const buttons = page.locator(selector);
+          const count = await buttons.count();
+          
+          for (let i = 0; i < count; i++) {
+            try {
+              const button = buttons.nth(i);
+              if (await button.isVisible({ timeout: 200 })) {
+                // Check if button is clickable and not disabled
+                const isEnabled = await button.isEnabled();
+                if (isEnabled) {
+                  await button.click();
+                  dismissedCount++;
+                  foundPopup = true;
+                  logger.debug(`✅ Dismissed popup via: ${selector}`);
+                  await page.waitForTimeout(300); // Small delay for popup to close
+                  break; // Move to next selector after successful click
+                }
+              }
+            } catch {
+              // Continue to next button
+            }
+          }
+          
+          if (foundPopup) break; // Move to next attempt after finding a popup
+        } catch {
+          // Continue to next selector
         }
+      }
+      
+      if (!foundPopup) break; // No more popups found, exit loop
+    }
+
+    // Try keyboard shortcuts to dismiss any remaining popups
+    const keyboardDismissals = ['Escape', 'Tab', 'Enter'];
+    for (const key of keyboardDismissals) {
+      try {
+        await page.keyboard.press(key);
+        await page.waitForTimeout(100);
       } catch {
         // Continue silently
       }
     }
 
-    // Quick escape press without waiting
-    page.keyboard.press('Escape').catch(() => {});
+    // Hide popup overlays with CSS as last resort
+    await page.addStyleTag({
+      content: `
+        /* Hide common popup overlays */
+        .ytd-popup-container,
+        .ytd-mealbar-promo-renderer,
+        .ytp-ce-element,
+        .ytp-cards-teaser,
+        .overlay,
+        .modal-overlay,
+        [role="dialog"]:not([aria-label*="Settings"]):not([aria-label*="Caption"]),
+        [role="alertdialog"],
+        .notification-topbar,
+        .masthead-ad-control,
+        ytd-consent-banner-renderer {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+        }
+        
+        /* Remove popup backgrounds */
+        .scrim,
+        .backdrop,
+        .overlay-background {
+          display: none !important;
+        }
+      `
+    }).catch(() => {});
+
+    if (dismissedCount > 0) {
+      logger.debug(`✅ Successfully dismissed ${dismissedCount} popup(s)`);
+    } else {
+      logger.debug('ℹ No popups found to dismiss');
+    }
     
-  } catch {
-    // Fail silently for speed
+  } catch (error) {
+    logger.debug(`⚠ Error while dismissing popups: ${error}`);
   }
 }
 
@@ -414,6 +565,101 @@ async function enableTheaterMode(page: Page, logger: Logger): Promise<void> {
     
   } catch (error) {
     logger.debug(`⚠ Could not enable theater mode: ${error}`);
+  }
+}
+
+async function enableDarkMode(page: Page, logger: Logger): Promise<void> {
+  try {
+    logger.debug('🌙 Enabling dark mode...');
+    
+    // Method 1: Try to find and click the dark mode toggle
+    const darkModeSelectors = [
+      'button[aria-label*="Dark theme"]',
+      'button[aria-label*="dark theme"]',
+      'button[title*="Dark theme"]',
+      'button[title*="dark theme"]',
+      '#avatar-btn', // Settings menu
+      'ytd-topbar-menu-button-renderer button'
+    ];
+
+    // First try direct dark mode toggle
+    for (const selector of darkModeSelectors.slice(0, 4)) {
+      try {
+        const button = page.locator(selector).first();
+        if (await button.isVisible({ timeout: 1000 })) {
+          await button.click();
+          logger.debug('✅ Dark mode toggled via button');
+          await page.waitForTimeout(500);
+          return;
+        }
+      } catch {
+        // Continue to next selector
+      }
+    }
+
+    // Method 2: Try accessing through settings menu
+    try {
+      // Click on user avatar/settings
+      const avatarButton = page.locator('#avatar-btn, ytd-topbar-menu-button-renderer button').first();
+      if (await avatarButton.isVisible({ timeout: 2000 })) {
+        await avatarButton.click();
+        await page.waitForTimeout(500);
+        
+        // Look for dark theme option in dropdown
+        const darkThemeOption = page.locator('text="Dark theme", text="Dark mode"').first();
+        if (await darkThemeOption.isVisible({ timeout: 1000 })) {
+          await darkThemeOption.click();
+          logger.debug('✅ Dark mode enabled via settings menu');
+          await page.waitForTimeout(500);
+          return;
+        }
+        
+        // Close menu if dark mode not found
+        await page.keyboard.press('Escape');
+      }
+    } catch (error) {
+      logger.debug(`⚠ Settings menu approach failed: ${error}`);
+    }
+
+    // Method 3: Inject CSS for dark mode if toggle not found
+    logger.debug('🔧 Applying dark mode via CSS injection...');
+    await page.addStyleTag({
+      content: `
+        /* Dark mode CSS override */
+        html[dark], [dark] {
+          --yt-spec-base-background: #0f0f0f !important;
+          --yt-spec-raised-background: #212121 !important;
+          --yt-spec-menu-background: #282828 !important;
+          --yt-spec-inverted-background: #f1f1f1 !important;
+          --yt-spec-outline: #303030 !important;
+          --yt-spec-text-primary: #f1f1f1 !important;
+          --yt-spec-text-secondary: #aaaaaa !important;
+          --yt-spec-text-disabled: #717171 !important;
+        }
+        
+        /* Force dark background */
+        body, #page-manager, ytd-app, #content {
+          background-color: #0f0f0f !important;
+          color: #f1f1f1 !important;
+        }
+        
+        /* Dark mode for various elements */
+        ytd-watch-flexy, 
+        #primary,
+        #secondary,
+        ytd-video-primary-info-renderer,
+        ytd-video-secondary-info-renderer,
+        ytd-comments {
+          background-color: #0f0f0f !important;
+          color: #f1f1f1 !important;
+        }
+      `
+    });
+    
+    logger.debug('✅ Dark mode applied via CSS');
+    
+  } catch (error) {
+    logger.debug(`⚠ Could not enable dark mode: ${error}`);
   }
 }
 
@@ -667,6 +913,15 @@ async function takeScreenshot(page: Page, videoId: string, config: Config, logge
   
   // Wait 5000ms before taking screenshot to ensure page is fully settled
   await page.waitForTimeout(5000);
+  
+  // Scroll to the top of the page before taking screenshot
+  logger.debug('📄 Scrolling to top of page...');
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+  
+  // Small delay to ensure scroll completes
+  await page.waitForTimeout(500);
   
   const filename = `${videoId}_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.png`;
   const screenshotPath = `${config.outputDir}/screenshots/${filename}`;

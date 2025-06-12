@@ -21,7 +21,10 @@ program
   .option('-r, --retries <number>', 'Max retries for failed requests', '3')
   .option('--headless', 'Run browser in headless mode', false)
   .option('--skip-screenshots', 'Skip taking screenshots', false)
-  .option('--verbose', 'Enable verbose logging', false);
+  .option('--verbose', 'Enable verbose logging', false)
+  .option('--dark-mode', 'Enable dark mode for YouTube pages', false)
+  .option('--theater-mode', 'Enable theater mode for video pages', false)
+  .option('--hide-suggested', 'Hide suggested videos and distractions', false);
 
 async function main() {
   program.parse();
@@ -57,6 +60,9 @@ async function main() {
     headless: options.headless,
     skipScreenshots: options.skipScreenshots,
     verbose: options.verbose,
+    useDarkMode: options.darkMode,
+    useTheaterMode: options.theaterMode,
+    hideSuggestedVideos: options.hideSuggested,
     outputDir: `/media/rob/D/youtube/metadata/${extractChannelName(channelUrl)}`
   };
 
