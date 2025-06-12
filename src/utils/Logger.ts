@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import chalk from "chalk";
 
 export class Logger {
   constructor(private verbose: boolean = false) {}
@@ -20,4 +20,4 @@ export class Logger {
       console.log(chalk.gray(`🐛 ${message}`));
     }
   }
-} 
+}

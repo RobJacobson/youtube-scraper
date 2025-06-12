@@ -33,4 +33,4 @@ export interface FailedVideo {
   url: string;
   error: string;
   retries_attempted: number;
-} 
+}

@@ -37,7 +37,7 @@ cd /home/rob/code/youtube-scraper
 # Interactive mode (prompts for channel URL)
 bun start
 
-# Direct usage with channel URL  
+# Direct usage with channel URL
 bun start --url "https://www.youtube.com/@WeAreUnidosUS"
 
 # Scrape with custom options
@@ -46,26 +46,28 @@ bun start --url "https://www.youtube.com/@WeAreUnidosUS" --limit 50 --verbose
 
 ## 📋 Command Line Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-u, --url <url>` | YouTube channel URL | Interactive prompt |
-| `-l, --limit <number>` | Maximum videos to scrape | 50 |
-| `-o, --offset <number>` | Starting offset for pagination | 0 |
-| `-d, --delay <number>` | Base delay between requests (ms) | 1000 |
-| `-r, --retries <number>` | Max retries for failed requests | 3 |
-| `--headless` | Run browser in headless mode | false |
-| `--skip-screenshots` | Skip taking screenshots | false |
-| `--verbose` | Enable detailed logging | false |
-| `--help` | Show help information | - |
+| Option                   | Description                      | Default            |
+| ------------------------ | -------------------------------- | ------------------ |
+| `-u, --url <url>`        | YouTube channel URL              | Interactive prompt |
+| `-l, --limit <number>`   | Maximum videos to scrape         | 50                 |
+| `-o, --offset <number>`  | Starting offset for pagination   | 0                  |
+| `-d, --delay <number>`   | Base delay between requests (ms) | 1000               |
+| `-r, --retries <number>` | Max retries for failed requests  | 3                  |
+| `--headless`             | Run browser in headless mode     | false              |
+| `--skip-screenshots`     | Skip taking screenshots          | false              |
+| `--verbose`              | Enable detailed logging          | false              |
+| `--help`                 | Show help information            | -                  |
 
 ## 💡 Usage Examples
 
 ### Basic Channel Scraping
+
 ```bash
 bun start --url "https://www.youtube.com/@WeAreUnidosUS"
 ```
 
 ### Advanced Configuration
+
 ```bash
 # Scrape 100 videos with 2-second delays, verbose logging
 bun start \
@@ -77,6 +79,7 @@ bun start \
 ```
 
 ### Pagination Support
+
 ```bash
 # Skip first 50 videos, get next 25
 bun start \
@@ -86,6 +89,7 @@ bun start \
 ```
 
 ### Screenshot-Only Mode
+
 ```bash
 # Only collect metadata, skip screenshots
 bun start \
@@ -189,7 +193,7 @@ bun run dev
 The scraper implements several performance optimizations and ethical practices:
 
 - **Exponential Backoff**: Automatically increases delays between retries
-- **Jittered Timing**: Adds randomness to prevent detection patterns  
+- **Jittered Timing**: Adds randomness to prevent detection patterns
 - **Resource Management**: Properly closes browser contexts and pages
 - **Memory Efficient**: Processes videos one at a time to avoid memory issues
 - **Graceful Degradation**: Continues scraping even when individual videos fail
@@ -199,17 +203,20 @@ The scraper implements several performance optimizations and ethical practices:
 ### Common Issues
 
 **Permission Denied for Output Directory**
+
 ```bash
 sudo mkdir -p /media/rob/D/youtube/metadata
 sudo chown -R $USER:$USER /media/rob/D/youtube/metadata
 ```
 
 **Browser Installation Issues**
+
 ```bash
 bunx playwright install --with-deps
 ```
 
 **Memory Issues with Large Channels**
+
 ```bash
 # Use smaller batches
 bun start --limit 25 --offset 0
@@ -217,6 +224,7 @@ bun start --limit 25 --offset 25
 ```
 
 **Network Timeouts**
+
 ```bash
 # Increase delays and retries
 bun start --delay 3000 --retries 5
@@ -240,6 +248,7 @@ bun start --verbose --url "https://www.youtube.com/@WeAreUnidosUS"
 - Respect for content creators' rights
 
 **Best Practices**:
+
 - Use reasonable delays between requests
 - Don't overwhelm YouTube's servers
 - Respect robots.txt if applicable
@@ -265,4 +274,4 @@ If you encounter issues:
 
 ---
 
-**Built with ❤️ using Bun and Playwright** 
+**Built with ❤️ using Bun and Playwright**
