@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import { YouTubeScraper } from './scraper/YouTubeScraper';
+import { scrapeYouTubeChannel } from './scraper/YouTubeScraper';
 import { Config } from './types/Config';
 import { setupDirectories } from './utils/fileSystem';
 
@@ -64,9 +64,8 @@ async function main() {
     // Setup output directories
     await setupDirectories(config.outputDir);
 
-    // Initialize and run scraper
-    const scraper = new YouTubeScraper(config);
-    await scraper.run();
+    // Run scraper using functional approach
+    await scrapeYouTubeChannel(config);
 
     console.log('\n✅ Scraping completed successfully!');
   } catch (error) {
