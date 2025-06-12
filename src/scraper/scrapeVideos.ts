@@ -18,9 +18,16 @@ import {
   takeScreenshot,
 } from "./helpers/contentHelpers";
 
+// Navigation and timeout constants
+const PAGE_NAVIGATION_TIMEOUT = 30000;
+const TITLE_SELECTOR_TIMEOUT = 10000;
+const FALLBACK_TITLE_TIMEOUT = 3000;
+const INITIAL_PAGE_DELAY = 1000;
+const PAGE_SETUP_DELAY = 1000;
+
 export async function scrapeVideos(
   videoUrls: string[],
-  scrapingContext: ScrapingContext,
+  scrapingContext: ScrapingContext
 ): Promise<{ success: VideoMetadata[]; failed: FailedVideo[] }> {
   const { config, logger, backoff } = scrapingContext;
   const success: VideoMetadata[] = [];
@@ -57,7 +64,7 @@ export async function scrapeVideos(
 
 async function scrapeVideoMetadata(
   url: string,
-  scrapingContext: ScrapingContext,
+  scrapingContext: ScrapingContext
 ): Promise<VideoMetadata> {
   const { context, config, logger } = scrapingContext;
   const page = await context.newPage();
@@ -65,7 +72,7 @@ async function scrapeVideoMetadata(
   try {
     await page.goto(url, {
       waitUntil: "networkidle",
-      timeout: 30000,
+      timeout: PAGE_NAVIGATION_TIMEOUT,
     });
 
     // Single page setup - combine all tasks
@@ -75,10 +82,10 @@ async function scrapeVideoMetadata(
     try {
       await page.waitForSelector("h1:not([hidden])", {
         state: "visible",
-        timeout: 10000,
+        timeout: TITLE_SELECTOR_TIMEOUT,
       });
     } catch {
-      await page.waitForSelector("title", { timeout: 3000 });
+      await page.waitForSelector("title", { timeout: FALLBACK_TITLE_TIMEOUT });
     }
 
     // Expand content and extract metadata
@@ -161,7 +168,7 @@ async function scrapeVideoMetadata(
         page,
         videoId,
         config,
-        logger,
+        logger
       );
       completeMetadata.screenshot_path = screenshotPath;
     }
@@ -176,11 +183,11 @@ async function scrapeVideoMetadata(
 async function setupPage(
   page: Page,
   config: Config,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   // Wait for initial load
   await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(INITIAL_PAGE_DELAY);
 
   // Single popup dismissal at the start
   await dismissPopups(page, logger);

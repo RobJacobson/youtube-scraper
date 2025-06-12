@@ -1,22 +1,32 @@
 import { chromium, Browser, BrowserContext } from "playwright";
 import { Config } from "../types/Config";
 import { ScrapingResult } from "../types/VideoMetadata";
-import { ExponentialBackoff } from "../utils/ExponentialBackoff";
+import {
+  BackoffDelayer,
+  createBackoffDelayer,
+} from "../utils/ExponentialBackoff";
 import { saveResults } from "../utils/fileSystem";
 import { Logger } from "../utils/Logger";
 import { getVideoUrls } from "./getVideoUrls";
 import { scrapeVideos } from "./scrapeVideos";
 
+// Browser configuration constants
+const VIEWPORT_WIDTH = 1024;
+const VIEWPORT_HEIGHT = 720;
+const DEVICE_SCALE_FACTOR = 1;
+const USER_AGENT =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+
 export interface ScrapingContext {
   browser: Browser;
   context: BrowserContext;
-  backoff: ExponentialBackoff;
+  backoff: BackoffDelayer;
   logger: Logger;
   config: Config;
 }
 
 export async function scrapeYouTubeChannel(
-  config: Config,
+  config: Config
 ): Promise<ScrapingResult> {
   const startTime = Date.now();
   const logger = new Logger(config.verbose);
@@ -54,7 +64,7 @@ export async function scrapeYouTubeChannel(
 
 async function initializeScraping(
   config: Config,
-  logger: Logger,
+  logger: Logger
 ): Promise<ScrapingContext> {
   logger.info("🔧 Initializing browser...");
 
@@ -70,14 +80,13 @@ async function initializeScraping(
   });
 
   const context = await browser.newContext({
-    viewport: { width: 1024, height: 720 },
-    deviceScaleFactor: 1,
-    userAgent:
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    viewport: { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT },
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    userAgent: USER_AGENT,
     colorScheme: config.useDarkMode ? "dark" : "light",
   });
 
-  const backoff = new ExponentialBackoff(config.baseDelay, config.maxRetries);
+  const backoff = createBackoffDelayer(config.baseDelay, config.maxRetries);
 
   return { browser, context, backoff, logger, config };
 }
@@ -85,7 +94,7 @@ async function initializeScraping(
 async function cleanupScraping(
   browser: Browser | null,
   context: BrowserContext | null,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   if (context) {
     await context.close();

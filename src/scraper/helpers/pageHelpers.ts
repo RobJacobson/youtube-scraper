@@ -1,14 +1,23 @@
 import { Page } from "playwright";
 import { Logger } from "../../utils/Logger";
 
+// Timeout constants
+const CONSENT_DIALOG_TIMEOUT = 5000;
+const CONSENT_DIALOG_DELAY = 1000;
+const POPUP_VISIBILITY_TIMEOUT = 500;
+const VIDEO_SELECTOR_TIMEOUT = 5000;
+const THEATER_MODE_DELAY = 200;
+const SCROLL_ITERATIONS = 5;
+const SCROLL_DELAY = 1500;
+
 export async function handleConsentDialog(page: Page): Promise<void> {
   try {
     const consentButton = page
       .locator('button:has-text("Accept all"), button:has-text("Reject all")')
       .first();
-    if (await consentButton.isVisible({ timeout: 5000 })) {
+    if (await consentButton.isVisible({ timeout: CONSENT_DIALOG_TIMEOUT })) {
       await consentButton.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(CONSENT_DIALOG_DELAY);
     }
   } catch {
     // Ignore if consent dialog not found
@@ -31,7 +40,7 @@ export async function dismissPopups(page: Page, logger: Logger): Promise<void> {
     for (const selector of popupSelectors) {
       try {
         const button = page.locator(selector).first();
-        if (await button.isVisible({ timeout: 500 })) {
+        if (await button.isVisible({ timeout: POPUP_VISIBILITY_TIMEOUT })) {
           await button.click();
           logger.debug("✅ Popup dismissed");
           break; // Exit after first successful dismissal
@@ -47,7 +56,7 @@ export async function dismissPopups(page: Page, logger: Logger): Promise<void> {
 
 export async function pauseVideo(page: Page, logger: Logger): Promise<void> {
   try {
-    await page.waitForSelector("video", { timeout: 5000 });
+    await page.waitForSelector("video", { timeout: VIDEO_SELECTOR_TIMEOUT });
 
     // Simple JavaScript pause - most reliable method
     await page.evaluate(() => {
@@ -65,11 +74,11 @@ export async function pauseVideo(page: Page, logger: Logger): Promise<void> {
 
 export async function enableTheaterMode(
   page: Page,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   try {
     await page.keyboard.press("t");
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(THEATER_MODE_DELAY);
     logger.debug("🎭 Theater mode enabled");
   } catch {
     // Theater mode might not be available
@@ -78,7 +87,7 @@ export async function enableTheaterMode(
 
 export async function enableDarkMode(
   page: Page,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   try {
     await page.emulateMedia({ colorScheme: "dark" });
@@ -90,7 +99,7 @@ export async function enableDarkMode(
 
 export async function hideSuggestedContent(
   page: Page,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   try {
     await page.addStyleTag({
@@ -111,13 +120,13 @@ export async function hideSuggestedContent(
 
 export async function scrollToLoadVideos(
   page: Page,
-  logger: Logger,
+  logger: Logger
 ): Promise<void> {
   logger.info("📜 Loading more videos...");
 
   // Simplified scrolling - just scroll to bottom and wait
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < SCROLL_ITERATIONS; i++) {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(SCROLL_DELAY);
   }
 }

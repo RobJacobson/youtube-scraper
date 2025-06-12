@@ -5,8 +5,12 @@ import {
   scrollToLoadVideos,
 } from "./helpers/pageHelpers";
 
+// URL discovery constants
+const CHANNEL_PAGE_TIMEOUT = 30000;
+const URL_PARAMETER_SPLIT_INDEX = 0;
+
 export async function getVideoUrls(
-  scrapingContext: ScrapingContext,
+  scrapingContext: ScrapingContext
 ): Promise<string[]> {
   const { context, config, logger } = scrapingContext;
   logger.info("🔍 Discovering videos on channel...");
@@ -16,7 +20,7 @@ export async function getVideoUrls(
   try {
     await page.goto(`${config.channelUrl}/videos`, {
       waitUntil: "networkidle",
-      timeout: 30000,
+      timeout: CHANNEL_PAGE_TIMEOUT,
     });
 
     // Handle consent and popups once
@@ -30,23 +34,23 @@ export async function getVideoUrls(
     const videoUrls = await page.evaluate(
       (configData) => {
         const links = Array.from(
-          document.querySelectorAll('a[href*="/watch?v="]'),
+          document.querySelectorAll('a[href*="/watch?v="]')
         );
         const uniqueUrls = [
           ...new Set(
             links.map((link) => {
               const href = (link as HTMLAnchorElement).href;
               return href.split("&")[0]; // Remove extra parameters
-            }),
+            })
           ),
         ];
 
         return uniqueUrls.slice(
           configData.offset,
-          configData.offset + configData.maxVideos,
+          configData.offset + configData.maxVideos
         );
       },
-      { maxVideos: config.maxVideos, offset: config.offset },
+      { maxVideos: config.maxVideos, offset: config.offset }
     );
 
     logger.info(`📹 Found ${videoUrls.length} videos to scrape`);

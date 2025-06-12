@@ -3,6 +3,9 @@ import { existsSync } from "node:fs";
 import path from "path";
 import { ScrapingResult } from "../types/VideoMetadata";
 
+// File formatting constants
+const JSON_INDENT_SPACES = 2;
+
 export async function setupDirectories(outputDir: string): Promise<void> {
   await ensureDir(outputDir);
   await ensureDir(path.join(outputDir, "screenshots"));
@@ -11,18 +14,22 @@ export async function setupDirectories(outputDir: string): Promise<void> {
 
 export async function saveResults(
   results: ScrapingResult,
-  outputDir: string,
+  outputDir: string
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `scraping_results_${timestamp}.json`;
   const filepath = path.join(outputDir, "data", filename);
 
-  await writeFile(filepath, JSON.stringify(results, null, 2), "utf8");
+  await writeFile(
+    filepath,
+    JSON.stringify(results, null, JSON_INDENT_SPACES),
+    "utf8"
+  );
 }
 
 export async function saveScreenshot(
   buffer: Buffer,
-  filepath: string,
+  filepath: string
 ): Promise<void> {
   await writeFile(filepath, buffer);
 }
