@@ -12,8 +12,9 @@ import { scrapeVideos } from "./scrapeVideos";
 import inquirer from "inquirer";
 
 // Browser configuration constants
-const VIEWPORT_WIDTH = 1000;
-const VIEWPORT_HEIGHT = 1200;
+const VIEWPORT_WIDTH = 800;
+const VIEWPORT_HEIGHT = 1024;
+const DEVICE_SCALE_FACTOR = 2.0;
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 
@@ -24,9 +25,9 @@ export interface ScrapingContext {
   config: Config;
 }
 
-export async function scrapeYouTubeChannel(
+export const scrapeYouTubeChannel = async (
   config: Config
-): Promise<ScrapingResult> {
+): Promise<ScrapingResult> => {
   const startTime = Date.now();
 
   // Initialize global logger
@@ -68,23 +69,9 @@ export async function scrapeYouTubeChannel(
   } finally {
     await cleanupScraping(browser, context, config.interactive);
   }
-}
+};
 
-async function promptForBrowserClose(): Promise<void> {
-  const { action } = await inquirer.prompt([
-    {
-      type: "input",
-      name: "action",
-      message: "Scraping complete! Press 'q' to close browser and exit:",
-      validate: (input: string) => {
-        const choice = input.toLowerCase().trim();
-        return choice === "q" || "Please press 'q' to quit";
-      },
-    },
-  ]);
-}
-
-async function initializeScraping(config: Config): Promise<ScrapingContext> {
+const initializeScraping = async (config: Config): Promise<ScrapingContext> => {
   const logger = getLogger();
   logger.info("🔧 Initializing browser...");
 
@@ -96,11 +83,15 @@ async function initializeScraping(config: Config): Promise<ScrapingContext> {
       "--disable-dev-shm-usage",
       "--disable-accelerated-2d-canvas",
       "--disable-gpu",
+      "--force-device-scale-factor=2",
+      "--high-dpi-support=1",
+      "--force-color-profile=srgb",
     ],
   });
 
   const context = await browser.newContext({
     viewport: { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT },
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
     userAgent: USER_AGENT,
     colorScheme: config.useDarkMode ? "dark" : "light",
   });
@@ -108,13 +99,13 @@ async function initializeScraping(config: Config): Promise<ScrapingContext> {
   const backoff = createBackoffDelayer(config.baseDelay, config.maxRetries);
 
   return { browser, context, backoff, config };
-}
+};
 
-async function cleanupScraping(
+const cleanupScraping = async (
   browser: Browser | null,
   context: BrowserContext | null,
   interactive: boolean = false
-): Promise<void> {
+): Promise<void> => {
   const logger = getLogger();
 
   if (context) {
@@ -124,4 +115,4 @@ async function cleanupScraping(
     await browser.close();
   }
   logger.info("🧹 Browser closed - cleanup completed");
-}
+};

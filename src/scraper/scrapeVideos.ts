@@ -7,8 +7,6 @@ import inquirer from "inquirer";
 import {
   dismissPopups,
   pauseVideo,
-  enableDarkMode,
-  enableTheaterMode,
   expandDescription,
   hideSuggestedContent,
 } from "./helpers/pageHelpers";
@@ -19,12 +17,12 @@ import { extractPageMetadata } from "./helpers/metadataExtractor";
 const PAGE_NAVIGATION_TIMEOUT = 30000;
 const TITLE_SELECTOR_TIMEOUT = 5000;
 const FALLBACK_TITLE_TIMEOUT = 2000;
-const INITIAL_PAGE_DELAY = 5000;
+const INITIAL_PAGE_DELAY = 1000;
 
-export async function scrapeVideos(
+export const scrapeVideos = async (
   videoUrls: string[],
   scrapingContext: ScrapingContext
-): Promise<{ success: VideoMetadata[]; failed: FailedVideo[] }> {
+): Promise<{ success: VideoMetadata[]; failed: FailedVideo[] }> => {
   const { config, backoff } = scrapingContext;
   const logger = getLogger();
   const success: VideoMetadata[] = [];
@@ -105,13 +103,13 @@ export async function scrapeVideos(
   }
 
   return { success, failed };
-}
+};
 
 // Modified function to return both metadata and page for interactive mode
-async function scrapeVideoMetadataWithPage(
+const scrapeVideoMetadataWithPage = async (
   url: string,
   scrapingContext: ScrapingContext
-): Promise<{ metadata: VideoMetadata; page: Page | null }> {
+): Promise<{ metadata: VideoMetadata; page: Page | null }> => {
   const { config } = scrapingContext;
 
   if (config.interactive) {
@@ -126,10 +124,10 @@ async function scrapeVideoMetadataWithPage(
     const metadata = await scrapeVideoMetadata(url, scrapingContext);
     return { metadata, page: null };
   }
-}
+};
 
 // Interactive mode user prompt
-async function promptUserAction(): Promise<boolean> {
+const promptUserAction = async (): Promise<boolean> => {
   const { action } = await inquirer.prompt([
     {
       type: "input",
@@ -147,14 +145,14 @@ async function promptUserAction(): Promise<boolean> {
   ]);
 
   return action.toLowerCase().trim() !== "q";
-}
+};
 
 // Helper function to log scraping duration
-function logScrapingDuration(
+const logScrapingDuration = (
   startTime: number,
   titleOrUrl: string,
   error?: string
-): void {
+): void => {
   const logger = getLogger();
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
@@ -167,12 +165,12 @@ function logScrapingDuration(
       }`
     );
   }
-}
+};
 
-async function scrapeVideoMetadata(
+const scrapeVideoMetadata = async (
   url: string,
   scrapingContext: ScrapingContext
-): Promise<VideoMetadata> {
+): Promise<VideoMetadata> => {
   const { context, config } = scrapingContext;
   const logger = getLogger();
   const startTime = Date.now();
@@ -236,31 +234,20 @@ async function scrapeVideoMetadata(
       );
     }
   }
-}
+};
 
 // Simplified page setup - one function, one popup dismissal
-async function setupPage(page: Page, config: Config): Promise<void> {
+const setupPage = async (page: Page, config: Config): Promise<void> => {
   // Wait for initial load
-  await page.waitForLoadState("networkidle");
   if (config.hideSuggestedVideos) {
     await hideSuggestedContent(page);
   }
+  await page.waitForLoadState("networkidle");
   await page.waitForTimeout(INITIAL_PAGE_DELAY);
-  console.log("Initial page delay complete");
-
   await pauseVideo(page);
   await dismissPopups(page);
   await expandDescription(page);
 
-  // if (config.useDarkMode) {
-  //   await enableDarkMode(page);
-  // }
-
-  // if (config.useTheaterMode) {
-  //   await enableTheaterMode(page);
-  //   await page.waitForTimeout(1000);
-  //   await pauseVideo(page);
-  // }
-
-  console.log("Setup tasks complete");
-}
+  const logger = getLogger();
+  logger.debug("Setup tasks complete");
+};

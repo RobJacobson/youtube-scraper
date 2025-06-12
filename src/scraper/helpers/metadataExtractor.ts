@@ -1,5 +1,6 @@
 import { Page } from "playwright";
 import { VideoMetadata } from "../../types/VideoMetadata";
+import { getLogger } from "../../utils/globalLogger";
 
 /**
  * Trims and cleans up video descriptions
@@ -20,102 +21,98 @@ function trimDescription(description: string): string {
   return trimmed.trim();
 }
 
+// Constants for metadata extraction
+const TITLE_SELECTOR = "h1.title";
+const CHANNEL_SELECTOR = "ytd-channel-name a";
+const VIEW_COUNT_SELECTOR = "span.view-count";
+const LIKE_COUNT_SELECTOR = "ytd-menu-renderer button[aria-label*='like']";
+const DESCRIPTION_SELECTOR = "ytd-expander#description";
+const UPLOAD_DATE_SELECTOR = "div#info-strings yt-formatted-string";
+const CATEGORY_SELECTOR = "div#info-strings yt-formatted-string:last-child";
+const CHANNEL_URL_SELECTOR = "ytd-channel-name a";
+const DURATION_SELECTOR = "span.ytp-time-duration";
+const THUMBNAIL_SELECTOR = "link[itemprop='thumbnailUrl']";
+
 /**
  * Extracts complete metadata from the YouTube video page
  * @param page - Playwright page instance
  * @param url - Video URL
  * @returns Promise with complete VideoMetadata object (excluding screenshot_path)
  */
-export async function extractPageMetadata(
+export const extractPageMetadata = async (
   page: Page,
   url: string
-): Promise<Omit<VideoMetadata, "screenshot_path">> {
-  // Extract video ID from URL
-  const videoId = extractVideoId(url);
+): Promise<Omit<VideoMetadata, "screenshot_path">> => {
+  const logger = getLogger();
+  logger.debug("🔍 Extracting page metadata...");
 
-  // Extract basic DOM metadata
-  const basicMetadata = await page.evaluate((videoUrl) => {
-    const getTextContent = (selector: string): string => {
-      const element = document.querySelector(selector);
-      return element?.textContent?.trim() || "";
-    };
+  try {
+    const [
+      title,
+      author,
+      viewCount,
+      likeCount,
+      description,
+      uploadDate,
+      category,
+      channelUrl,
+      duration,
+      thumbnailUrl,
+    ] = await Promise.all([
+      page.textContent(TITLE_SELECTOR),
+      page.textContent(CHANNEL_SELECTOR),
+      page.textContent(VIEW_COUNT_SELECTOR),
+      page.textContent(LIKE_COUNT_SELECTOR),
+      page.textContent(DESCRIPTION_SELECTOR),
+      page.textContent(UPLOAD_DATE_SELECTOR),
+      page.textContent(CATEGORY_SELECTOR),
+      page.getAttribute(CHANNEL_URL_SELECTOR, "href"),
+      page.textContent(DURATION_SELECTOR),
+      page.getAttribute(THUMBNAIL_SELECTOR, "href"),
+    ]);
 
-    const getAttribute = (selector: string, attr: string): string => {
-      const element = document.querySelector(selector);
-      return element?.getAttribute(attr) || "";
-    };
+    const id = extractVideoId(url);
 
     return {
-      url: videoUrl,
-      title:
-        getTextContent('h1[data-e2e="video-title"]') ||
-        getTextContent("h1.ytd-video-primary-info-renderer") ||
-        getTextContent("h1.title") ||
-        getTextContent("h1"),
-      description:
-        getTextContent("#description-text") ||
-        getTextContent("#description") ||
-        getTextContent("#description-inline-expander") ||
-        getTextContent(".description") ||
-        getTextContent('[data-e2e="video-description"]') ||
-        getTextContent("#watch-description-text"),
-      author:
-        getTextContent("#owner-name a") ||
-        getTextContent(".channel-name") ||
-        getTextContent('[data-e2e="video-author"]'),
-      channelUrl:
-        getAttribute("#owner-name a", "href") ||
-        getAttribute(".channel-name a", "href"),
-      viewCount:
-        getTextContent("#info-text") ||
-        getTextContent(".view-count") ||
-        getTextContent('[data-e2e="video-view-count"]'),
-      likeCount:
-        getTextContent('button[aria-label*="like"] span[role="text"]') ||
-        getTextContent(".like-count"),
-      publishedDate:
-        getTextContent("#info-text") ||
-        getTextContent(".date") ||
-        getTextContent('[data-e2e="video-publish-date"]'),
-      duration:
-        getTextContent(".ytp-time-duration") ||
-        getAttribute('meta[itemprop="duration"]', "content"),
-      thumbnailUrl:
-        getAttribute('link[itemprop="thumbnailUrl"]', "href") ||
-        getAttribute('meta[property="og:image"]', "content"),
-      category:
-        getAttribute('meta[itemprop="genre"]', "content") ||
-        getAttribute('meta[property="og:video:genre"]', "content"),
-      uploadDate:
-        getAttribute('meta[itemprop="uploadDate"]', "content") ||
-        getAttribute('meta[property="og:video:release_date"]', "content"),
+      id,
+      url,
+      title: title?.trim() || "",
+      author: author?.trim() || "",
+      viewCount: viewCount?.trim() || "",
+      likeCount: likeCount?.trim() || "",
+      description: description?.trim() || "",
+      uploadDate: uploadDate?.trim() || "",
+      category: category?.trim() || "",
+      channelUrl: channelUrl || "",
+      duration: duration?.trim() || "",
+      thumbnailUrl: thumbnailUrl || "",
+      language: "en", // Default to English
+      publishedDate: uploadDate?.trim() || "", // Use upload date as published date
+      scraped_at: new Date().toISOString(),
+      tags: [], // Will be populated by extractVideoMetadata
     };
-  }, url);
+  } catch (error) {
+    logger.error("❌ Error extracting metadata:", error);
+    throw error; // Propagate error to caller
+  }
+};
 
-  // Extract additional metadata
-  const [tags, language] = await Promise.all([
-    extractTags(page),
-    extractLanguage(page),
-  ]);
-
-  // Return complete metadata object with cleaned description
-  return {
-    id: videoId,
-    ...basicMetadata,
-    description: trimDescription(basicMetadata.description),
-    tags,
-    language,
-    scraped_at: new Date().toISOString(),
-  };
-}
-
-// Helper functions for metadata extraction
-function extractVideoId(url: string): string {
+/**
+ * Extracts video ID from the URL
+ * @param url - Video URL
+ * @returns Video ID
+ */
+export const extractVideoId = (url: string): string => {
   const match = url.match(/[?&]v=([^&#]*)/);
   return match ? match[1] : "";
-}
+};
 
-async function extractTags(page: Page): Promise<string[]> {
+/**
+ * Extracts tags from the video page
+ * @param page - Playwright page instance
+ * @returns Array of tags
+ */
+export const extractTags = async (page: Page): Promise<string[]> => {
   try {
     return await page.evaluate(() => {
       const metaTags = Array.from(
@@ -128,7 +125,31 @@ async function extractTags(page: Page): Promise<string[]> {
   } catch {
     return [];
   }
-}
+};
+
+/**
+ * Extracts complete metadata from the YouTube video page
+ * @param page - Playwright page instance
+ * @param url - Video URL
+ * @returns Promise with complete VideoMetadata object (excluding screenshot_path)
+ */
+export const extractVideoMetadata = async (
+  page: Page,
+  url: string
+): Promise<VideoMetadata> => {
+  const logger = getLogger();
+  logger.debug("🔍 Extracting video metadata...");
+
+  const [pageMetadata, tags] = await Promise.all([
+    extractPageMetadata(page, url),
+    extractTags(page),
+  ]);
+
+  return {
+    ...pageMetadata,
+    tags,
+  };
+};
 
 async function extractLanguage(page: Page): Promise<string> {
   try {

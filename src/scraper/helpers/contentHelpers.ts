@@ -7,12 +7,12 @@ import { getLogger } from "../../utils/globalLogger";
 const VIDEO_ID_REGEX_GROUP = 1;
 const SCREENSHOT_SCROLL_DELAY = 5000;
 
-export function extractVideoId(url: string): string {
+export const extractVideoId = (url: string): string => {
   const match = url.match(/[?&]v=([^&#]*)/);
   return match ? match[VIDEO_ID_REGEX_GROUP] : "";
-}
+};
 
-export async function extractTags(page: Page): Promise<string[]> {
+export const extractTags = async (page: Page): Promise<string[]> => {
   try {
     return await page.evaluate(() => {
       const metaTags = Array.from(
@@ -25,13 +25,13 @@ export async function extractTags(page: Page): Promise<string[]> {
   } catch {
     return [];
   }
-}
+};
 
-export async function takeScreenshot(
+export const takeScreenshot = async (
   page: Page,
   videoId: string,
   config: Config
-): Promise<string> {
+): Promise<string> => {
   const logger = getLogger();
   logger.debug("📸 Taking screenshot...");
 
@@ -47,4 +47,4 @@ export async function takeScreenshot(
 
   logger.debug(`📸 Screenshot saved: ${screenshotPath}`);
   return screenshotPath;
-}
+};

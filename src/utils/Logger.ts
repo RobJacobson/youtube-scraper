@@ -10,7 +10,7 @@ export class Logger {
   }
 
   info(message: string): void {
-    console.log(chalk.blue(`${this.getTimeStamp()} ℹ ${message}`));
+    console.log(chalk.blue(`${this.getTimeStamp()} ℹ️  ${message}`));
   }
 
   success(message: string): void {
@@ -23,7 +23,7 @@ export class Logger {
 
   debug(message: string): void {
     if (this.verbose) {
-      console.log(chalk.gray(`${this.getTimeStamp()} 🐛 ${message}`));
+      console.log(chalk.gray(`${this.getTimeStamp()} 💭 ${message}`));
     }
   }
 }

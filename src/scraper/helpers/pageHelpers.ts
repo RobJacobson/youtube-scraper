@@ -8,7 +8,7 @@ const SCROLL_ITERATIONS = 5;
 const SCROLL_DELAY = 1000;
 
 // Generic helper for parallel button detection and clicking
-async function findAndClickButton(
+const findAndClickButton = async (
   page: Page,
   selectors: string[],
   options: {
@@ -16,15 +16,19 @@ async function findAndClickButton(
     timeout?: number;
     successMessage?: string;
   }
-): Promise<boolean> {
-  const { checkEnabled = false, successMessage = "Button clicked" } = options;
+): Promise<boolean> => {
+  const {
+    checkEnabled = false,
+    timeout = 200,
+    successMessage = "Button clicked",
+  } = options;
   const logger = getLogger();
 
   // Process all selectors in parallel - each handles check and click
   const results = await Promise.allSettled(
     selectors.map(async (selector) => {
       const locator = page.locator(selector).first();
-      const visible = await locator.isVisible({ timeout: 500 });
+      const visible = await locator.isVisible({ timeout });
 
       if (visible) {
         const enabled = checkEnabled ? await locator.isEnabled() : true;
@@ -48,28 +52,49 @@ async function findAndClickButton(
   }
 
   return clicked;
-}
+};
 
-export async function handleConsentDialog(page: Page): Promise<void> {
+export const handleConsentDialog = async (page: Page): Promise<void> => {
   const consentSelectors = [
-    'button:has-text("Accept all")',
-    'button:has-text("Reject all")',
+    'button[aria-label*="consent"]',
+    'button[aria-label*="Accept"]',
+    'button[aria-label*="agree"]',
+    'button[aria-label*="I agree"]',
+    'button[aria-label*="I accept"]',
   ];
 
   await findAndClickButton(page, consentSelectors, {
+    timeout: CONSENT_DIALOG_TIMEOUT,
     successMessage: "✅ Consent dialog handled",
   });
-}
+};
 
-export async function dismissPopups(page: Page): Promise<void> {
-  const popupSelectors = ["button[aria-label='Dismiss']"];
+export const dismissPopups = async (page: Page): Promise<void> => {
+  const popupSelectors = [
+    'button[aria-label*="Close"]',
+    'button[aria-label*="Dismiss"]',
+    'button[aria-label*="Skip"]',
+    'button[aria-label*="Not now"]',
+  ];
 
   await findAndClickButton(page, popupSelectors, {
-    successMessage: "✅ Popup dismissed",
+    successMessage: "✅ Popups dismissed",
   });
-}
+};
 
-export async function pauseVideo(page: Page): Promise<void> {
+export const expandDescription = async (page: Page): Promise<void> => {
+  const expandSelectors = [
+    'button[aria-label*="Show more"]',
+    'button[aria-label*="Expand"]',
+    'button[aria-label*="More"]',
+  ];
+
+  await findAndClickButton(page, expandSelectors, {
+    successMessage: "📝 Description expanded",
+  });
+};
+
+export const pauseVideo = async (page: Page): Promise<void> => {
   try {
     await page.waitForSelector("video", { timeout: VIDEO_SELECTOR_TIMEOUT });
     await page.evaluate(() => {
@@ -82,52 +107,30 @@ export async function pauseVideo(page: Page): Promise<void> {
   } catch {
     // Video might not be present or pausable
   }
-}
-export async function expandDescription(page: Page): Promise<void> {
-  const selectors = ["tp-yt-paper-button#expand"];
+};
 
-  await findAndClickButton(page, selectors, {
-    checkEnabled: true,
-    successMessage: "✅ Description expanded",
-  });
-}
-
-export async function enableTheaterMode(page: Page): Promise<void> {
-  const theaterSelectors = [".ytp-size-button"];
-
-  await findAndClickButton(page, theaterSelectors, {
-    successMessage: "🎭 Theater mode enabled",
-  });
-}
-
-export async function enableDarkMode(page: Page): Promise<void> {
+export const enableDarkMode = async (page: Page): Promise<void> => {
   try {
     await page.emulateMedia({ colorScheme: "dark" });
     getLogger().debug("🌙 Dark mode enabled");
   } catch {
     // Dark mode might not be supported
   }
-}
+};
 
-export async function hideSuggestedContent(page: Page): Promise<void> {
-  try {
-    await page.addStyleTag({
-      content: `
-        #secondary,
-        ytd-watch-next-secondary-results-renderer,
-        .ytp-ce-element,
-        .ytp-cards-teaser {
-          display: none !important;
-        }
-      `,
-    });
-    getLogger().debug("🚫 Suggested content hidden");
-  } catch {
-    // CSS injection might fail
-  }
-}
+export const hideSuggestedContent = async (page: Page): Promise<void> => {
+  const hideSelectors = [
+    'button[aria-label*="Hide"]',
+    'button[aria-label*="Not interested"]',
+    'button[aria-label*="Don\'t recommend"]',
+  ];
 
-export async function scrollToLoadVideos(page: Page): Promise<void> {
+  await findAndClickButton(page, hideSelectors, {
+    successMessage: "🙈 Suggested content hidden",
+  });
+};
+
+export const scrollToLoadVideos = async (page: Page): Promise<void> => {
   const logger = getLogger();
   logger.info("📜 Loading more videos...");
 
@@ -143,4 +146,4 @@ export async function scrollToLoadVideos(page: Page): Promise<void> {
     });
     await page.waitForTimeout(SCROLL_DELAY);
   }
-}
+};
