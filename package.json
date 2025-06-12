@@ -21,7 +21,8 @@
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "typescript": "^5.8.3"
   },
   "keywords": [
     "youtube",

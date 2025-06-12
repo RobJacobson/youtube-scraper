@@ -1,4 +1,5 @@
 import { ScrapingContext } from "./scrapeYouTubeChannel";
+import { getLogger } from "../utils/globalLogger";
 import {
   handleConsentDialog,
   dismissPopups,
@@ -12,7 +13,8 @@ const URL_PARAMETER_SPLIT_INDEX = 0;
 export async function getVideoUrls(
   scrapingContext: ScrapingContext
 ): Promise<string[]> {
-  const { context, config, logger } = scrapingContext;
+  const { context, config } = scrapingContext;
+  const logger = getLogger();
   logger.info("🔍 Discovering videos on channel...");
 
   const page = await context.newPage();
@@ -25,10 +27,10 @@ export async function getVideoUrls(
 
     // Handle consent and popups once
     await handleConsentDialog(page);
-    await dismissPopups(page, logger);
+    await dismissPopups(page);
 
     // Scroll to load more videos
-    await scrollToLoadVideos(page, logger);
+    await scrollToLoadVideos(page);
 
     // Extract video URLs
     const videoUrls = await page.evaluate(

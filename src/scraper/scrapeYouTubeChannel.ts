@@ -6,14 +6,14 @@ import {
   createBackoffDelayer,
 } from "../utils/ExponentialBackoff";
 import { saveResults } from "../utils/fileSystem";
-import { Logger } from "../utils/Logger";
+import { initializeLogger, getLogger } from "../utils/globalLogger";
 import { getVideoUrls } from "./getVideoUrls";
 import { scrapeVideos } from "./scrapeVideos";
 
 // Browser configuration constants
 const VIEWPORT_WIDTH = 1920;
 const VIEWPORT_HEIGHT = 1080;
-const DEVICE_SCALE_FACTOR = 1;
+const DEVICE_SCALE_FACTOR = 1.5; // 150% zoom
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 
@@ -21,7 +21,6 @@ export interface ScrapingContext {
   browser: Browser;
   context: BrowserContext;
   backoff: BackoffDelayer;
-  logger: Logger;
   config: Config;
 }
 
@@ -29,14 +28,18 @@ export async function scrapeYouTubeChannel(
   config: Config
 ): Promise<ScrapingResult> {
   const startTime = Date.now();
-  const logger = new Logger(config.verbose);
+
+  // Initialize global logger
+  initializeLogger(config.verbose);
+  const logger = getLogger();
+
   logger.info("🚀 Starting YouTube scraper...");
 
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
 
   try {
-    const scrapingContext = await initializeScraping(config, logger);
+    const scrapingContext = await initializeScraping(config);
     browser = scrapingContext.browser;
     context = scrapingContext.context;
 
@@ -58,14 +61,12 @@ export async function scrapeYouTubeChannel(
 
     return scrapingResult;
   } finally {
-    await cleanupScraping(browser, context, new Logger(config.verbose));
+    await cleanupScraping(browser, context);
   }
 }
 
-async function initializeScraping(
-  config: Config,
-  logger: Logger
-): Promise<ScrapingContext> {
+async function initializeScraping(config: Config): Promise<ScrapingContext> {
+  const logger = getLogger();
   logger.info("🔧 Initializing browser...");
 
   const browser = await chromium.launch({
@@ -88,14 +89,14 @@ async function initializeScraping(
 
   const backoff = createBackoffDelayer(config.baseDelay, config.maxRetries);
 
-  return { browser, context, backoff, logger, config };
+  return { browser, context, backoff, config };
 }
 
 async function cleanupScraping(
   browser: Browser | null,
-  context: BrowserContext | null,
-  logger: Logger
+  context: BrowserContext | null
 ): Promise<void> {
+  const logger = getLogger();
   if (context) {
     await context.close();
   }

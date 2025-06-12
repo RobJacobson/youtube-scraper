@@ -2,21 +2,20 @@ import { Page } from "playwright";
 import { VideoMetadata } from "../../types/VideoMetadata";
 
 /**
- * Extracts core metadata from the YouTube video page DOM
+ * Extracts complete metadata from the YouTube video page
  * @param page - Playwright page instance
  * @param url - Video URL
- * @returns Promise with extracted metadata (excluding id, tags, language, scraped_at, screenshot_path)
+ * @returns Promise with complete VideoMetadata object (excluding screenshot_path)
  */
 export async function extractPageMetadata(
   page: Page,
   url: string
-): Promise<
-  Omit<
-    VideoMetadata,
-    "id" | "tags" | "language" | "scraped_at" | "screenshot_path"
-  >
-> {
-  return await page.evaluate((videoUrl) => {
+): Promise<Omit<VideoMetadata, "screenshot_path">> {
+  // Extract video ID from URL
+  const videoId = extractVideoId(url);
+
+  // Extract basic DOM metadata
+  const basicMetadata = await page.evaluate((videoUrl) => {
     const getTextContent = (selector: string): string => {
       const element = document.querySelector(selector);
       return element?.textContent?.trim() || "";
@@ -73,4 +72,51 @@ export async function extractPageMetadata(
         getAttribute('meta[property="og:video:release_date"]', "content"),
     };
   }, url);
+
+  // Extract additional metadata
+  const [tags, language] = await Promise.all([
+    extractTags(page),
+    extractLanguage(page),
+  ]);
+
+  // Return complete metadata object
+  return {
+    id: videoId,
+    ...basicMetadata,
+    tags,
+    language,
+    scraped_at: new Date().toISOString(),
+  };
+}
+
+// Helper functions for metadata extraction
+function extractVideoId(url: string): string {
+  const match = url.match(/[?&]v=([^&#]*)/);
+  return match ? match[1] : "";
+}
+
+async function extractTags(page: Page): Promise<string[]> {
+  try {
+    return await page.evaluate(() => {
+      const metaTags = Array.from(
+        document.querySelectorAll('meta[property="og:video:tag"]')
+      );
+      return metaTags
+        .map((tag) => tag.getAttribute("content"))
+        .filter(Boolean) as string[];
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function extractLanguage(page: Page): Promise<string> {
+  try {
+    return await page.evaluate(() => {
+      const langMeta = document.querySelector('meta[itemprop="inLanguage"]');
+      return langMeta?.getAttribute("content") || "unknown";
+    });
+  } catch {
+    return "unknown";
+  }
 }
