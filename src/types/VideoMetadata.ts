@@ -1,22 +1,23 @@
-export interface VideoMetadata {
+export type VideoMetadata = {
   id: string;
   url: string;
   title: string;
   description: string;
-  author: string;
-  channelUrl: string;
-  publishedDate: string;
+  keywords: string;
+  image: string;
+  name: string;
   duration: string;
-  viewCount: string;
-  likeCount: string;
-  thumbnailUrl: string;
-  tags: string[];
-  category: string;
-  language: string;
+  width: string;
+  height: string;
+  userInteractionCount: string;
+  datePublished: string;
   uploadDate: string;
+  genre: string;
+  expandedDescription: string;
+  scraped_url: string;
   scraped_at: string;
   screenshot_path?: string;
-}
+};
 
 export interface ScrapingResult {
   success: VideoMetadata[];

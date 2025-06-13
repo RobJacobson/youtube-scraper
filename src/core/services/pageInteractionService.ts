@@ -1,5 +1,6 @@
 import { Page } from "playwright";
 import { log } from "../../utils/logger";
+import { SELECTORS } from "../../shared/constants/ScrapingConstants";
 
 // Timeout constants
 const CONSENT_DIALOG_TIMEOUT = 5000;
@@ -127,11 +128,40 @@ export const createPageInteractionService = (): PageInteractionService => {
   };
 
   const expandDescription = async (page: Page): Promise<void> => {
-    const expandSelectors = ["#expand"];
+    // Debug: Log available expand-related elements
+    // try {
+    //   const expandElements = await page.evaluate(() => {
+    //     const elements = [
+    //       ...document.querySelectorAll("tp-yt-paper-button"),
+    //       ...document.querySelectorAll('[id*="expand"]'),
+    //       ...document.querySelectorAll('[aria-label*="more"]'),
+    //       ...document.querySelectorAll('[aria-label*="Show more"]'),
+    //       ...document.querySelectorAll("ytd-text-inline-expander"),
+    //     ];
+    //     return elements.map((el) => ({
+    //       tagName: el.tagName,
+    //       id: el.id,
+    //       ariaLabel: el.getAttribute("aria-label"),
+    //       hidden: el.hasAttribute("hidden"),
+    //       visible:
+    //         !el.hasAttribute("hidden") &&
+    //         getComputedStyle(el).display !== "none",
+    //       textContent: el.textContent?.trim()?.substring(0, 50),
+    //     }));
+    //   });
+    //   log.debug(
+    //     `Found ${
+    //       expandElements.length
+    //     } expand-related elements: ${JSON.stringify(expandElements, null, 2)}`
+    //   );
+    // } catch (error) {
+    //   log.debug(`Could not debug expand elements: ${error}`);
+    // }
 
-    await findAndClickButton(page, expandSelectors, {
+    await findAndClickButton(page, [...SELECTORS.EXPAND_BUTTONS], {
       successMessage: "📝 Description expanded",
-      errorMessage: "❌ Description not expanded",
+      errorMessage:
+        "❌ Description not expanded - button may not be present or visible",
     });
   };
 

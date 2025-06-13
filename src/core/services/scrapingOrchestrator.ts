@@ -9,7 +9,7 @@ import { BrowserService } from "./browserService";
 import { VideoDiscoveryService } from "./videoDiscoveryService";
 import { PageInteractionService } from "./pageInteractionService";
 import { MetadataExtractionService } from "./metadataExtractionService";
-import { ScreenshotService } from "./screenshotService";
+import { VideoOutputService } from "./videoOutputService";
 import {
   BackoffDelayer,
   createBackoffDelayer,
@@ -25,6 +25,7 @@ const INITIAL_PAGE_DELAY = 1000;
 
 export interface ScrapingOrchestrator {
   scrapeChannel: (config: Config) => Promise<ScrapingResult>;
+  scrapeSingleVideo: (config: Config) => Promise<ScrapingResult>;
 }
 
 export const createScrapingOrchestrator = (
@@ -32,10 +33,8 @@ export const createScrapingOrchestrator = (
   videoDiscoveryService: VideoDiscoveryService,
   pageInteractionService: PageInteractionService,
   metadataExtractionService: MetadataExtractionService,
-  screenshotService: ScreenshotService
+  videoOutputService: VideoOutputService
 ): ScrapingOrchestrator => {
-  
-
   const promptUserAction = async (): Promise<boolean> => {
     const { action } = await inquirer.prompt([
       {
@@ -74,10 +73,10 @@ export const createScrapingOrchestrator = (
     }
   };
 
-  const scrapeVideoMetadata = async (
+  const scrapeVideoMetadataWithPage = async (
     url: string,
     config: Config
-  ): Promise<VideoMetadata> => {
+  ): Promise<{ metadata: VideoMetadata; page: Page }> => {
     const context = browserService.getContext();
     const startTime = Date.now();
 
@@ -118,23 +117,20 @@ export const createScrapingOrchestrator = (
         url
       );
 
-      // Take screenshot if enabled
-      const screenshotPath = await screenshotService.takeScreenshot(
+      // Use the new video output service to save all data
+      const savedFolderPath = await videoOutputService.saveVideoData(
+        metadata,
         page,
-        metadata.id,
-        {
-          outputDir: config.outputDir,
-          skipScreenshots: config.skipScreenshots,
-        }
+        config.outputDir,
+        config.skipScreenshots
       );
 
       const finalMetadata: VideoMetadata = {
         ...metadata,
-        screenshot_path: screenshotPath,
       };
 
-      logScrapingDuration(startTime, finalMetadata.title);
-      return finalMetadata;
+      logScrapingDuration(startTime, finalMetadata.title || url);
+      return { metadata: finalMetadata, page };
     } catch (error) {
       logScrapingDuration(
         startTime,
@@ -142,30 +138,8 @@ export const createScrapingOrchestrator = (
         error instanceof Error ? error.message : String(error)
       );
       throw error;
-    } finally {
-      if (!config.interactive) {
-        await page.close();
-      }
     }
-  };
-
-  const scrapeVideoMetadataWithPage = async (
-    url: string,
-    config: Config
-  ): Promise<{ metadata: VideoMetadata; page: Page | null }> => {
-    if (config.interactive) {
-      // In interactive mode, return page for inspection
-      const metadata = await scrapeVideoMetadata(url, config);
-      // Get the last opened page from context
-      const context = browserService.getContext();
-      const pages = context.pages();
-      const page = pages[pages.length - 1];
-      return { metadata, page };
-    } else {
-      // Normal mode - page is closed in scrapeVideoMetadata
-      const metadata = await scrapeVideoMetadata(url, config);
-      return { metadata, page: null };
-    }
+    // Note: Don't close the page here, let the caller handle it
   };
 
   const scrapeVideos = async (
@@ -201,25 +175,34 @@ export const createScrapingOrchestrator = (
         success.push(metadata);
         log.info(`✅ Successfully scraped: ${metadata.title}`);
 
-        // Track page in interactive mode
-        if (config.interactive && page) {
-          openPages.push(page);
-        }
-
         // Interactive mode: prompt user after successful scrape
         if (config.interactive) {
+          // Track page for cleanup later
+          openPages.push(page);
+
           const shouldContinue = await promptUserAction();
           if (!shouldContinue) {
             log.info("🛑 User requested exit - stopping scraper...");
             break;
           }
-          // Close the page after user prompt
-          if (page) {
-            await page.close();
-            log.debug("📄 Page closed after user prompt");
-          }
+        } else {
+          // Non-interactive mode: close page immediately after processing
+          await page.close();
+          log.debug("📄 Page closed after processing");
         }
       } catch (error) {
+        // Try to close any page that might have been created
+        try {
+          const context = browserService.getContext();
+          const pages = context.pages();
+          const lastPage = pages[pages.length - 1];
+          if (lastPage && !config.interactive) {
+            await lastPage.close();
+          }
+        } catch (closeError) {
+          // Ignore cleanup errors
+        }
+
         const failedVideo: FailedVideo = {
           url,
           error: error instanceof Error ? error.message : String(error),
@@ -297,7 +280,48 @@ export const createScrapingOrchestrator = (
     }
   };
 
+  const scrapeSingleVideo = async (config: Config): Promise<ScrapingResult> => {
+    const startTime = Date.now();
+    log.info("🚀 Starting single video scraper...");
+
+    // Create backoff with config values
+    const backoff = createBackoffDelayer(config.baseDelay, config.maxRetries);
+
+    try {
+      // Initialize browser
+      await browserService.initialize({
+        headless: config.headless,
+        interactive: config.interactive,
+        useDarkMode: config.useDarkMode,
+      });
+
+      // For single video, the channelUrl is actually the video URL
+      const videoUrl = config.channelUrl;
+
+      // Scrape the single video
+      const results = await scrapeVideos([videoUrl], config, backoff);
+
+      const scrapingResult: ScrapingResult = {
+        ...results,
+        summary: {
+          total_attempted: 1,
+          successful: results.success.length,
+          failed: results.failed.length,
+          duration_ms: Date.now() - startTime,
+        },
+      };
+
+      log.info(
+        `📊 Single video scraping completed: ${results.success.length}/1 successful`
+      );
+      return scrapingResult;
+    } finally {
+      await browserService.cleanup();
+    }
+  };
+
   return {
     scrapeChannel,
+    scrapeSingleVideo,
   };
 };

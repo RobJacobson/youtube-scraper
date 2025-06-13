@@ -1,7 +1,7 @@
 // Browser configuration constants
 export const BROWSER_CONFIG = {
-  VIEWPORT_WIDTH: 800,
-  VIEWPORT_HEIGHT: 1024,
+  VIEWPORT_WIDTH: 1024,
+  VIEWPORT_HEIGHT: 2000,
   DEVICE_SCALE_FACTOR: 2.0,
   USER_AGENT:
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -49,26 +49,11 @@ export const SELECTORS = {
     'button[aria-label*="Not interested"]',
     'button[aria-label*="Don\'t recommend"]',
   ],
-  EXPAND_BUTTONS: ["#expand"],
+  EXPAND_BUTTONS: ["tp-yt-paper-button#expand:not([hidden])"],
   VIDEO_LINKS: 'a[href*="/watch?v="]',
   VIDEO_ELEMENT: "video",
   TITLE_VISIBLE: "h1:not([hidden])",
   TITLE_FALLBACK: "title",
-} as const;
-
-// Metadata extraction selectors
-export const METADATA_SELECTORS = {
-  TITLE: "h1.title",
-  CHANNEL: "ytd-channel-name a",
-  VIEW_COUNT: "span.view-count",
-  LIKE_COUNT: "ytd-menu-renderer button[aria-label*='like']",
-  DESCRIPTION: "ytd-expander#description",
-  UPLOAD_DATE: "div#info-strings yt-formatted-string",
-  CATEGORY: "div#info-strings yt-formatted-string:last-child",
-  CHANNEL_URL: "ytd-channel-name a",
-  DURATION: "span.ytp-time-duration",
-  THUMBNAIL: "link[itemprop='thumbnailUrl']",
-  VIDEO_TAGS: 'meta[property="og:video:tag"]',
 } as const;
 
 // Default values

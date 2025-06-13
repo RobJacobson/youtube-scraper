@@ -14,25 +14,40 @@ import {
   createMetadataExtractionService,
   MetadataExtractionService,
 } from "../services/metadataExtractionService";
-import {
-  createScreenshotService,
-  ScreenshotService,
-} from "../services/screenshotService";
+
 import {
   createScrapingOrchestrator,
   ScrapingOrchestrator,
 } from "../services/scrapingOrchestrator";
+import {
+  createImageDownloadService,
+  ImageDownloadService,
+} from "../services/imageDownloadService";
+import {
+  createHtmlSaveService,
+  HtmlSaveService,
+} from "../services/htmlSaveService";
+import {
+  createVideoOutputService,
+  VideoOutputService,
+} from "../services/videoOutputService";
 
 // Simplified service container - just create and return services
 export const createServiceContainer = () => {
   const browserService = createBrowserService();
   const pageInteractionService = createPageInteractionService();
   const metadataExtractionService = createMetadataExtractionService();
-  const screenshotService = createScreenshotService();
+  const imageDownloadService = createImageDownloadService();
+  const htmlSaveService = createHtmlSaveService();
 
   const videoDiscoveryService = createVideoDiscoveryService(
     browserService,
     pageInteractionService
+  );
+
+  const videoOutputService = createVideoOutputService(
+    imageDownloadService,
+    htmlSaveService
   );
 
   const scrapingOrchestrator = createScrapingOrchestrator(
@@ -40,15 +55,17 @@ export const createServiceContainer = () => {
     videoDiscoveryService,
     pageInteractionService,
     metadataExtractionService,
-    screenshotService
+    videoOutputService
   );
 
   return {
     browserService,
     pageInteractionService,
     metadataExtractionService,
-    screenshotService,
+    imageDownloadService,
+    htmlSaveService,
     videoDiscoveryService,
+    videoOutputService,
     scrapingOrchestrator,
     cleanup: async () => {
       if (browserService.isInitialized()) {

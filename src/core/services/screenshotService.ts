@@ -13,14 +13,12 @@ export interface ScreenshotConfig {
 export interface ScreenshotService {
   takeScreenshot: (
     page: Page,
-    videoId: string,
+    fileName: string,
     config: ScreenshotConfig
   ) => Promise<string | undefined>;
 }
 
 export const createScreenshotService = (): ScreenshotService => {
-  
-
   const extractVideoId = (url: string): string => {
     const match = url.match(/[?&]v=([^&#]*)/);
     return match ? match[1] : "";
@@ -28,7 +26,7 @@ export const createScreenshotService = (): ScreenshotService => {
 
   const takeScreenshot = async (
     page: Page,
-    videoId: string,
+    fileName: string,
     config: ScreenshotConfig
   ): Promise<string | undefined> => {
     if (config.skipScreenshots) {
@@ -39,8 +37,7 @@ export const createScreenshotService = (): ScreenshotService => {
     log.debug("📸 Taking screenshot...");
 
     try {
-      const filename = `${format(new Date(), "yyyy-MM-dd")} ${videoId}.png`;
-      const screenshotPath = `${config.outputDir}/screenshots/${filename}`;
+      const screenshotPath = `${config.outputDir}/screenshot/${fileName}.png`;
 
       await page.waitForTimeout(SCREENSHOT_SCROLL_DELAY);
       await page.screenshot({

@@ -2,106 +2,12 @@ import { Page } from "playwright";
 import { VideoMetadata } from "../../types/VideoMetadata";
 import { log } from "../../utils/logger";
 
-// Constants for metadata extraction
-const TITLE_SELECTOR = "h1.title";
-const CHANNEL_SELECTOR = "ytd-channel-name a";
-const VIEW_COUNT_SELECTOR = "span.view-count";
-const LIKE_COUNT_SELECTOR = "ytd-menu-renderer button[aria-label*='like']";
-const DESCRIPTION_SELECTOR = "ytd-expander#description";
-const UPLOAD_DATE_SELECTOR = "div#info-strings yt-formatted-string";
-const CATEGORY_SELECTOR = "div#info-strings yt-formatted-string:last-child";
-const CHANNEL_URL_SELECTOR = "ytd-channel-name a";
-const DURATION_SELECTOR = "span.ytp-time-duration";
-const THUMBNAIL_SELECTOR = "link[itemprop='thumbnailUrl']";
-
 export interface MetadataExtractionService {
   extractVideoMetadata: (page: Page, url: string) => Promise<VideoMetadata>;
 }
 
 export const createMetadataExtractionService =
   (): MetadataExtractionService => {
-    
-
-    const extractPageMetadata = async (
-      page: Page,
-      url: string
-    ): Promise<Omit<VideoMetadata, "tags">> => {
-      log.debug("🔍 Extracting page metadata...");
-
-      try {
-        const [
-          title,
-          author,
-          viewCount,
-          likeCount,
-          description,
-          uploadDate,
-          category,
-          channelUrl,
-          duration,
-          thumbnailUrl,
-        ] = await Promise.all([
-          page.textContent(TITLE_SELECTOR),
-          page.textContent(CHANNEL_SELECTOR),
-          page.textContent(VIEW_COUNT_SELECTOR),
-          page.textContent(LIKE_COUNT_SELECTOR),
-          page.textContent(DESCRIPTION_SELECTOR),
-          page.textContent(UPLOAD_DATE_SELECTOR),
-          page.textContent(CATEGORY_SELECTOR),
-          page.getAttribute(CHANNEL_URL_SELECTOR, "href"),
-          page.textContent(DURATION_SELECTOR),
-          page.getAttribute(THUMBNAIL_SELECTOR, "href"),
-        ]);
-
-        const id = extractVideoId(url);
-
-        return {
-          id,
-          url,
-          title: title?.trim() || "",
-          author: author?.trim() || "",
-          viewCount: viewCount?.trim() || "",
-          likeCount: likeCount?.trim() || "",
-          description: trimDescription(description?.trim() || ""),
-          uploadDate: uploadDate?.trim() || "",
-          category: category?.trim() || "",
-          channelUrl: channelUrl || "",
-          duration: duration?.trim() || "",
-          thumbnailUrl: thumbnailUrl || "",
-          language: "en", // Default to English
-          publishedDate: uploadDate?.trim() || "", // Use upload date as published date
-          scraped_at: new Date().toISOString(),
-        };
-      } catch (error) {
-        log.error(
-          `❌ Error extracting metadata: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-        throw error; // Propagate error to caller
-      }
-    };
-
-    const extractTags = async (page: Page): Promise<string[]> => {
-      try {
-        return await page.evaluate(() => {
-          const metaTags = Array.from(
-            document.querySelectorAll('meta[property="og:video:tag"]')
-          );
-          return metaTags
-            .map((tag) => tag.getAttribute("content"))
-            .filter(Boolean) as string[];
-        });
-      } catch {
-        return [];
-      }
-    };
-
-    const extractVideoId = (url: string): string => {
-      const match = url.match(/[?&]v=([^&#]*)/);
-      return match ? match[1] : "";
-    };
-
     const trimDescription = (description: string): string => {
       if (!description) return "";
 
@@ -116,22 +22,85 @@ export const createMetadataExtractionService =
       return trimmed.trim();
     };
 
+    const extractAllMetaTags = async (page: Page) => {
+      return await page.evaluate(() => {
+        const metaTags = [...document.querySelectorAll("meta")];
+        const results = metaTags.reduce((acc, tag) => {
+          const attribute =
+            tag.getAttribute("property") ||
+            tag.getAttribute("name") ||
+            tag.getAttribute("itemprop");
+          const content = tag.getAttribute("content");
+          if (attribute && content) {
+            acc[attribute] = content;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+        console.log(results);
+        return results;
+      });
+    };
+
+    const extractExpandedDescription = async (page: Page): Promise<string> => {
+      return await page.evaluate(() => {
+        const descriptionElement = document.querySelector(
+          "#description-inline-expander > yt-attributed-string"
+        ) as HTMLElement;
+        return descriptionElement?.innerText || "";
+      });
+    };
+
+    const extractPageMetadata = async (
+      page: Page,
+      url: string
+    ): Promise<Omit<VideoMetadata, "tags">> => {
+      try {
+        // Extract all meta tags in a single comprehensive call
+        const combinedMetaTags = await extractAllMetaTags(page);
+
+        log.debug(
+          `📝 Extracted ${
+            Object.keys(combinedMetaTags).length
+          } meta tags for video ${url}`
+        );
+
+        console.log(JSON.stringify(combinedMetaTags, null, 2));
+
+        const expandedDescription = await extractExpandedDescription(page);
+
+        return {
+          id: combinedMetaTags["identifier"],
+          url: combinedMetaTags["og:url"],
+          title: combinedMetaTags["og:title"],
+          description: combinedMetaTags["og:description"],
+          keywords: combinedMetaTags["keywords"],
+          image: combinedMetaTags["og:image"],
+          name: combinedMetaTags["name"],
+          duration: combinedMetaTags["duration"],
+          width: combinedMetaTags["width"],
+          height: combinedMetaTags["height"],
+          userInteractionCount: combinedMetaTags["userInteractionCount"],
+          datePublished: combinedMetaTags["datePublished"],
+          uploadDate: combinedMetaTags["uploadDate"],
+          genre: combinedMetaTags["genre"],
+          expandedDescription,
+          scraped_url: url,
+          scraped_at: new Date().toISOString(),
+        };
+      } catch (error) {
+        log.error(
+          `❌ Error extracting metadata: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+        throw error;
+      }
+    };
+
     const extractVideoMetadata = async (
       page: Page,
       url: string
-    ): Promise<VideoMetadata> => {
-      log.debug("🔍 Extracting video metadata...");
-
-      const [pageMetadata, tags] = await Promise.all([
-        extractPageMetadata(page, url),
-        extractTags(page),
-      ]);
-
-      return {
-        ...pageMetadata,
-        tags,
-      };
-    };
+    ): Promise<VideoMetadata> => await extractPageMetadata(page, url);
 
     return {
       extractVideoMetadata,
