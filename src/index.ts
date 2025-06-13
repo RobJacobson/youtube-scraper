@@ -2,9 +2,8 @@
 
 import { Command } from "commander";
 import inquirer from "inquirer";
-import { scrapeYouTubeChannel } from "./scraper/scrapeYouTubeChannel";
+import { createYouTubeScraperApplication } from "./application/youTubeScraperApplication";
 import { Config } from "./types/Config";
-import { setupDirectories } from "./utils/fileSystem";
 
 const program = new Command()
   .name("youtube-scraper")
@@ -30,7 +29,7 @@ const program = new Command()
     false
   );
 
-async function main() {
+const main = async (): Promise<void> => {
   program.parse();
   const options = program.opts();
 
@@ -57,16 +56,16 @@ async function main() {
   };
 
   try {
-    await setupDirectories(config.outputDir);
-    await scrapeYouTubeChannel(config);
+    const app = createYouTubeScraperApplication();
+    await app.run(config);
     console.log("\n✅ Scraping completed successfully!");
   } catch (error) {
     console.error("\n❌ Scraping failed:", error);
     process.exit(1);
   }
-}
+};
 
-async function promptForUrl(): Promise<string> {
+const promptForUrl = async (): Promise<string> => {
   const { url } = await inquirer.prompt([
     {
       type: "input",
@@ -78,11 +77,11 @@ async function promptForUrl(): Promise<string> {
     },
   ]);
   return url;
-}
+};
 
-function extractChannelName(url: string): string {
+const extractChannelName = (url: string): string => {
   const match = url.match(/\/@([^\/]+)/);
   return match?.[1] || "unknown-channel";
-}
+};
 
 main().catch(console.error);
