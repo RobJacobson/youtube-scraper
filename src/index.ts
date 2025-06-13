@@ -2,8 +2,10 @@
 
 import { Command } from "commander";
 import inquirer from "inquirer";
-import { createYouTubeScraperApplication } from "./application/youTubeScraperApplication";
 import { Config } from "./types/Config";
+import { getServiceContainer } from "./core/container/serviceContainer";
+import { initializeLogger } from "./utils/globalLogger";
+import { saveResults, setupDirectories } from "./utils/fileSystem";
 
 const program = new Command()
   .name("youtube-scraper")
@@ -55,13 +57,30 @@ const main = async (): Promise<void> => {
     )}`,
   };
 
+  // Initialize global logger
+  initializeLogger(config.verbose);
+
+  const serviceContainer = getServiceContainer();
+
   try {
-    const app = createYouTubeScraperApplication();
-    await app.run(config);
+    // Setup output directories
+    await setupDirectories(config.outputDir);
+
+    // Execute the scraping process
+    const result = await serviceContainer.scrapingOrchestrator.scrapeChannel(
+      config
+    );
+
+    // Save results
+    await saveResults(result, config.outputDir);
+
     console.log("\n✅ Scraping completed successfully!");
   } catch (error) {
     console.error("\n❌ Scraping failed:", error);
     process.exit(1);
+  } finally {
+    // Cleanup services
+    await serviceContainer.cleanup();
   }
 };
 

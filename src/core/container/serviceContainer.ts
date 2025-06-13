@@ -23,24 +23,13 @@ import {
   ScrapingOrchestrator,
 } from "../services/scrapingOrchestrator";
 
-export interface ServiceContainer {
-  browserService: BrowserService;
-  pageInteractionService: PageInteractionService;
-  metadataExtractionService: MetadataExtractionService;
-  screenshotService: ScreenshotService;
-  videoDiscoveryService: VideoDiscoveryService;
-  scrapingOrchestrator: ScrapingOrchestrator;
-  cleanup: () => Promise<void>;
-}
-
-export const createServiceContainer = (): ServiceContainer => {
-  // Create service instances
+// Simplified service container - just create and return services
+export const createServiceContainer = () => {
   const browserService = createBrowserService();
   const pageInteractionService = createPageInteractionService();
   const metadataExtractionService = createMetadataExtractionService();
   const screenshotService = createScreenshotService();
 
-  // Services with dependencies
   const videoDiscoveryService = createVideoDiscoveryService(
     browserService,
     pageInteractionService
@@ -54,13 +43,6 @@ export const createServiceContainer = (): ServiceContainer => {
     screenshotService
   );
 
-  const cleanup = async (): Promise<void> => {
-    // Cleanup browser service if needed
-    if (browserService.isInitialized()) {
-      await browserService.cleanup();
-    }
-  };
-
   return {
     browserService,
     pageInteractionService,
@@ -68,14 +50,18 @@ export const createServiceContainer = (): ServiceContainer => {
     screenshotService,
     videoDiscoveryService,
     scrapingOrchestrator,
-    cleanup,
+    cleanup: async () => {
+      if (browserService.isInitialized()) {
+        await browserService.cleanup();
+      }
+    },
   };
 };
 
 // Singleton instance
-let containerInstance: ServiceContainer | null = null;
+let containerInstance: ReturnType<typeof createServiceContainer> | null = null;
 
-export const getServiceContainer = (): ServiceContainer => {
+export const getServiceContainer = () => {
   if (!containerInstance) {
     containerInstance = createServiceContainer();
   }
