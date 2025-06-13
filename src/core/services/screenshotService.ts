@@ -1,6 +1,6 @@
 import { Page } from "playwright";
 import { format } from "date-fns";
-import { getLogger } from "../../utils/globalLogger";
+import { log } from "../../utils/logger";
 
 // Constants for screenshot handling
 const SCREENSHOT_SCROLL_DELAY = 5000;
@@ -19,7 +19,7 @@ export interface ScreenshotService {
 }
 
 export const createScreenshotService = (): ScreenshotService => {
-  const logger = getLogger();
+  
 
   const extractVideoId = (url: string): string => {
     const match = url.match(/[?&]v=([^&#]*)/);
@@ -32,11 +32,11 @@ export const createScreenshotService = (): ScreenshotService => {
     config: ScreenshotConfig
   ): Promise<string | undefined> => {
     if (config.skipScreenshots) {
-      logger.debug("📸 Screenshots disabled - skipping");
+      log.debug("📸 Screenshots disabled - skipping");
       return undefined;
     }
 
-    logger.debug("📸 Taking screenshot...");
+    log.debug("📸 Taking screenshot...");
 
     try {
       const filename = `${format(new Date(), "yyyy-MM-dd")} ${videoId}.png`;
@@ -49,10 +49,10 @@ export const createScreenshotService = (): ScreenshotService => {
         type: "png",
       });
 
-      logger.debug(`📸 Screenshot saved: ${screenshotPath}`);
+      log.debug(`📸 Screenshot saved: ${screenshotPath}`);
       return screenshotPath;
     } catch (error) {
-      logger.error(
+      log.error(
         `❌ Failed to take screenshot: ${
           error instanceof Error ? error.message : "Unknown error"
         }`

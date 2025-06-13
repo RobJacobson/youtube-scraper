@@ -1,7 +1,7 @@
 import { Page } from "playwright";
 import { BrowserService } from "./browserService";
 import { PageInteractionService } from "./pageInteractionService";
-import { getLogger } from "../../utils/globalLogger";
+import { log } from "../../utils/logger";
 
 // URL discovery constants
 const CHANNEL_PAGE_TIMEOUT = 30000;
@@ -20,7 +20,7 @@ export const createVideoDiscoveryService = (
   browserService: BrowserService,
   pageInteractionService: PageInteractionService
 ): VideoDiscoveryService => {
-  const logger = getLogger();
+  
 
   const navigateToChannelVideos = async (
     page: Page,
@@ -72,7 +72,7 @@ export const createVideoDiscoveryService = (
   const discoverVideoUrls = async (
     config: VideoDiscoveryConfig
   ): Promise<string[]> => {
-    logger.info("🔍 Discovering videos on channel...");
+    log.info("🔍 Discovering videos on channel...");
 
     const context = browserService.getContext();
     const page = await context.newPage();
@@ -84,7 +84,7 @@ export const createVideoDiscoveryService = (
 
       const videoUrls = await extractVideoUrls(page, config);
 
-      logger.info(`📹 Found ${videoUrls.length} videos to scrape`);
+      log.info(`📹 Found ${videoUrls.length} videos to scrape`);
       return videoUrls;
     } finally {
       await page.close();

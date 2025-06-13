@@ -1,5 +1,5 @@
 import { Page } from "playwright";
-import { getLogger } from "../../utils/globalLogger";
+import { log } from "../../utils/logger";
 
 // Timeout constants
 const CONSENT_DIALOG_TIMEOUT = 5000;
@@ -25,8 +25,6 @@ export interface PageInteractionService {
 }
 
 export const createPageInteractionService = (): PageInteractionService => {
-  const logger = getLogger();
-
   // Generic helper for parallel button detection and clicking
   const findAndClickButton = async (
     page: Page,
@@ -65,7 +63,7 @@ export const createPageInteractionService = (): PageInteractionService => {
             }
             return false;
           } catch (error) {
-            logger.debug(
+            log.debug(
               `Failed to process selector "${selector}": ${
                 error instanceof Error ? error.message : "Unknown error"
               }`
@@ -80,21 +78,21 @@ export const createPageInteractionService = (): PageInteractionService => {
       );
 
       if (clicked) {
-        logger.info(successMessage);
+        log.info(successMessage);
         await page.waitForTimeout(500);
       } else if (errorMessage) {
-        logger.error(errorMessage);
+        log.error(errorMessage);
       }
 
       return clicked;
     } catch (error) {
-      logger.error(
+      log.error(
         `Error in findAndClickButton: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
       if (errorMessage) {
-        logger.error(errorMessage);
+        log.error(errorMessage);
       }
       return false;
     }
@@ -146,7 +144,7 @@ export const createPageInteractionService = (): PageInteractionService => {
           video.pause();
         }
       });
-      logger.debug("⏸️ Video paused");
+      log.debug("⏸️ Video paused");
     } catch {
       // Video might not be present or pausable
     }
@@ -155,7 +153,7 @@ export const createPageInteractionService = (): PageInteractionService => {
   const enableDarkMode = async (page: Page): Promise<void> => {
     try {
       await page.emulateMedia({ colorScheme: "dark" });
-      logger.debug("🌙 Dark mode enabled");
+      log.debug("🌙 Dark mode enabled");
     } catch {
       // Dark mode might not be supported
     }
@@ -174,7 +172,7 @@ export const createPageInteractionService = (): PageInteractionService => {
   };
 
   const scrollToLoadVideos = async (page: Page): Promise<void> => {
-    logger.info("📜 Loading more videos...");
+    log.info("📜 Loading more videos...");
 
     // Simplified scrolling - just scroll to bottom and wait
     for (let i = 0; i < SCROLL_ITERATIONS; i++) {

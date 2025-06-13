@@ -1,6 +1,6 @@
 import { Page } from "playwright";
 import { VideoMetadata } from "../../types/VideoMetadata";
-import { getLogger } from "../../utils/globalLogger";
+import { log } from "../../utils/logger";
 
 // Constants for metadata extraction
 const TITLE_SELECTOR = "h1.title";
@@ -20,13 +20,13 @@ export interface MetadataExtractionService {
 
 export const createMetadataExtractionService =
   (): MetadataExtractionService => {
-    const logger = getLogger();
+    
 
     const extractPageMetadata = async (
       page: Page,
       url: string
     ): Promise<Omit<VideoMetadata, "tags">> => {
-      logger.debug("🔍 Extracting page metadata...");
+      log.debug("🔍 Extracting page metadata...");
 
       try {
         const [
@@ -73,7 +73,7 @@ export const createMetadataExtractionService =
           scraped_at: new Date().toISOString(),
         };
       } catch (error) {
-        logger.error(
+        log.error(
           `❌ Error extracting metadata: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
@@ -120,7 +120,7 @@ export const createMetadataExtractionService =
       page: Page,
       url: string
     ): Promise<VideoMetadata> => {
-      logger.debug("🔍 Extracting video metadata...");
+      log.debug("🔍 Extracting video metadata...");
 
       const [pageMetadata, tags] = await Promise.all([
         extractPageMetadata(page, url),

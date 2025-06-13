@@ -14,7 +14,7 @@ import {
   BackoffDelayer,
   createBackoffDelayer,
 } from "../../utils/ExponentialBackoff";
-import { getLogger, resetTime } from "../../utils/globalLogger";
+import { log, resetTime } from "../../utils/logger";
 import inquirer from "inquirer";
 
 // Navigation and timeout constants
@@ -34,7 +34,7 @@ export const createScrapingOrchestrator = (
   metadataExtractionService: MetadataExtractionService,
   screenshotService: ScreenshotService
 ): ScrapingOrchestrator => {
-  const logger = getLogger();
+  
 
   const promptUserAction = async (): Promise<boolean> => {
     const { action } = await inquirer.prompt([
@@ -64,9 +64,9 @@ export const createScrapingOrchestrator = (
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
     if (!error) {
-      logger.info(`⏱️  Page scraped in ${duration}s: ${titleOrUrl}`);
+      log.info(`⏱️  Page scraped in ${duration}s: ${titleOrUrl}`);
     } else {
-      logger.error(
+      log.error(
         `❌ Page scraping failed after ${duration}s: ${titleOrUrl}${
           error ? ` - ${error}` : ""
         }`
@@ -81,7 +81,7 @@ export const createScrapingOrchestrator = (
     const context = browserService.getContext();
     const startTime = Date.now();
 
-    logger.debug(`🔍 Starting page scrape: ${url}`);
+    log.debug(`🔍 Starting page scrape: ${url}`);
 
     const page = await context.newPage();
 
@@ -177,10 +177,10 @@ export const createScrapingOrchestrator = (
     const failed: FailedVideo[] = [];
     const openPages: Page[] = []; // Track open pages in interactive mode
 
-    logger.info(`📊 Starting to scrape ${videoUrls.length} videos...`);
+    log.info(`📊 Starting to scrape ${videoUrls.length} videos...`);
 
     if (config.interactive) {
-      logger.info(
+      log.info(
         "🎮 Interactive mode enabled - you'll be prompted after each page"
       );
     }
@@ -191,7 +191,7 @@ export const createScrapingOrchestrator = (
       // Reset the clock before processing each video
       resetTime();
 
-      logger.info(`🎥 Processing video ${i + 1}/${videoUrls.length}: ${url}`);
+      log.info(`🎥 Processing video ${i + 1}/${videoUrls.length}: ${url}`);
 
       try {
         const { metadata, page } = await scrapeVideoMetadataWithPage(
@@ -199,7 +199,7 @@ export const createScrapingOrchestrator = (
           config
         );
         success.push(metadata);
-        logger.info(`✅ Successfully scraped: ${metadata.title}`);
+        log.info(`✅ Successfully scraped: ${metadata.title}`);
 
         // Track page in interactive mode
         if (config.interactive && page) {
@@ -210,13 +210,13 @@ export const createScrapingOrchestrator = (
         if (config.interactive) {
           const shouldContinue = await promptUserAction();
           if (!shouldContinue) {
-            logger.info("🛑 User requested exit - stopping scraper...");
+            log.info("🛑 User requested exit - stopping scraper...");
             break;
           }
           // Close the page after user prompt
           if (page) {
             await page.close();
-            logger.debug("📄 Page closed after user prompt");
+            log.debug("📄 Page closed after user prompt");
           }
         }
       } catch (error) {
@@ -226,13 +226,13 @@ export const createScrapingOrchestrator = (
           retries_attempted: config.maxRetries,
         };
         failed.push(failedVideo);
-        logger.error(`❌ Failed to scrape: ${url} - ${failedVideo.error}`);
+        log.error(`❌ Failed to scrape: ${url} - ${failedVideo.error}`);
 
         // Interactive mode: prompt user even after failures
         if (config.interactive) {
           const shouldContinue = await promptUserAction();
           if (!shouldContinue) {
-            logger.info("🛑 User requested exit - stopping scraper...");
+            log.info("🛑 User requested exit - stopping scraper...");
             break;
           }
         }
@@ -246,7 +246,7 @@ export const createScrapingOrchestrator = (
 
     // Clean up any remaining open pages in interactive mode
     if (config.interactive && openPages.length > 0) {
-      logger.debug(`🧹 Closing ${openPages.length} remaining pages...`);
+      log.debug(`🧹 Closing ${openPages.length} remaining pages...`);
       await Promise.all(openPages.map((page) => page.close().catch(() => {})));
     }
 
@@ -255,7 +255,7 @@ export const createScrapingOrchestrator = (
 
   const scrapeChannel = async (config: Config): Promise<ScrapingResult> => {
     const startTime = Date.now();
-    logger.info("🚀 Starting YouTube scraper...");
+    log.info("🚀 Starting YouTube scraper...");
 
     // Create backoff with config values
     const backoff = createBackoffDelayer(config.baseDelay, config.maxRetries);
@@ -288,7 +288,7 @@ export const createScrapingOrchestrator = (
         },
       };
 
-      logger.info(
+      log.info(
         `📊 Scraping completed: ${results.success.length}/${videoUrls.length} successful`
       );
       return scrapingResult;

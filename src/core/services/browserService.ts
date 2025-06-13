@@ -1,5 +1,5 @@
 import { Browser, BrowserContext, chromium } from "playwright";
-import { getLogger } from "../../utils/globalLogger";
+import { log } from "../../utils/logger";
 
 // Browser configuration constants
 const VIEWPORT_WIDTH = 800;
@@ -28,11 +28,10 @@ export interface BrowserService {
 }
 
 export const createBrowserService = (): BrowserService => {
-  const logger = getLogger();
   let state: BrowserState = { browser: null, context: null };
 
   const initialize = async (config: BrowserServiceConfig): Promise<void> => {
-    logger.info("🔧 Initializing browser...");
+    log.info("🔧 Initializing browser...");
 
     state.browser = await chromium.launch({
       headless: config.interactive ? false : config.headless,
@@ -55,7 +54,7 @@ export const createBrowserService = (): BrowserService => {
       colorScheme: config.useDarkMode ? "dark" : "light",
     });
 
-    logger.info("✅ Browser initialized successfully");
+    log.info("✅ Browser initialized successfully");
   };
 
   const getContext = (): BrowserContext => {
@@ -75,7 +74,7 @@ export const createBrowserService = (): BrowserService => {
   };
 
   const cleanup = async (): Promise<void> => {
-    logger.info("🧹 Cleaning up browser resources...");
+    log.info("🧹 Cleaning up browser resources...");
 
     if (state.context) {
       await state.context.close();
@@ -87,7 +86,7 @@ export const createBrowserService = (): BrowserService => {
       state.browser = null;
     }
 
-    logger.info("✅ Browser cleanup completed");
+    log.info("✅ Browser cleanup completed");
   };
 
   const isInitialized = (): boolean => {

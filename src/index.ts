@@ -4,7 +4,7 @@ import { Command } from "commander";
 import inquirer from "inquirer";
 import { Config } from "./types/Config";
 import { getServiceContainer } from "./core/container/serviceContainer";
-import { initializeLogger } from "./utils/globalLogger";
+import { initializeLogger } from "./utils/logger";
 import { saveResults, setupDirectories } from "./utils/fileSystem";
 
 const program = new Command()
