@@ -9,7 +9,7 @@ export interface BackoffDelayer {
 
 export function createBackoffDelayer(
   baseDelay: number = DEFAULT_BASE_DELAY,
-  maxRetries: number = DEFAULT_MAX_RETRIES
+  maxRetries: number = DEFAULT_MAX_RETRIES,
 ): BackoffDelayer {
   return {
     async delay(): Promise<void> {

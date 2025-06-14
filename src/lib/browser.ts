@@ -3,16 +3,14 @@ import { log } from "../utils/logger";
 import { BrowserConfig, PageConfig } from "../types";
 
 // Browser configuration constants
-const VIEWPORT_WIDTH = 800;
-const VIEWPORT_HEIGHT = 1024;
+const VIEWPORT_WIDTH = 1000;
+const VIEWPORT_HEIGHT = VIEWPORT_WIDTH * 1.25;
 const DEVICE_SCALE_FACTOR = 2.0;
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 
 // Timeout constants
-const CONSENT_DIALOG_TIMEOUT = 5000;
-const VIDEO_SELECTOR_TIMEOUT = 5000;
-const SCROLL_DELAY = 1000;
+const PAUSE = 500;
 const SCROLL_ITERATIONS = 5;
 
 // Browser state
@@ -62,67 +60,29 @@ export async function cleanupBrowser(): Promise<void> {
   }
 }
 
-export async function setupPage(page: Page, config: PageConfig): Promise<void> {
-  // Handle consent dialog
+export async function setupPage(
+  page: Page,
+  config: PageConfig,
+  videoPage: boolean,
+): Promise<void> {
+  // Handle consent dialog first
   await handleConsentDialog(page);
-  await page.waitForTimeout(1000);
 
-  // Apply page configurations
-  if (config.useDarkMode) {
-    await enableDarkMode(page);
-    await page.waitForTimeout(1000);
-  }
+  // Enable dark mode
+  if (config.useDarkMode) await enableDarkMode(page);
 
-  if (config.useTheaterMode) {
-    await enableTheaterMode(page);
-    await page.waitForTimeout(1000);
-  }
-
-  if (config.hideSuggestedVideos) {
+  if (videoPage) {
+    // Hide suggested content
     await hideSuggestedContent(page);
-    await page.waitForTimeout(1000);
-  }
 
-  // Dismiss any popups
-  await dismissPopups(page);
-  await page.waitForTimeout(1000);
-}
+    // Expand description
+    await expandDescription(page);
 
-async function handleConsentDialog(page: Page): Promise<void> {
-  try {
-    const consentButton = page.locator('button:has-text("Accept all")').first();
-    if (await consentButton.isVisible({ timeout: CONSENT_DIALOG_TIMEOUT })) {
-      await consentButton.click();
-      log.debug("✅ Accepted consent dialog");
-    }
-  } catch (error) {
-    // Consent dialog not found or already dismissed
-  }
-}
+    // Dismiss popups
+    await dismissPopups(page);
 
-async function enableDarkMode(page: Page): Promise<void> {
-  try {
-    await page.evaluate(() => {
-      document.documentElement.setAttribute("dark", "");
-      document.documentElement.setAttribute("data-theme", "dark");
-    });
-    log.debug("🌙 Dark mode enabled");
-  } catch (error) {
-    log.debug("⚠️ Could not enable dark mode");
-  }
-}
-
-async function enableTheaterMode(page: Page): Promise<void> {
-  try {
-    const theaterButton = page.locator(
-      'button[title*="Theater"], button[aria-label*="Theater"]'
-    );
-    if (await theaterButton.isVisible({ timeout: 2000 })) {
-      await theaterButton.click();
-      log.debug("🎭 Theater mode enabled");
-    }
-  } catch (error) {
-    log.debug("⚠️ Could not enable theater mode");
+    // Enable theater mode
+    if (config.useTheaterMode) await enableTheaterMode(page);
   }
 }
 
@@ -138,46 +98,106 @@ async function hideSuggestedContent(page: Page): Promise<void> {
   } catch (error) {
     log.debug("⚠️ Could not hide suggested content");
   }
+  await page.waitForTimeout(PAUSE);
 }
+88;
 
-async function dismissPopups(page: Page): Promise<void> {
-  const popupSelectors = [
-    'button[aria-label*="Dismiss"]',
-    'button[aria-label*="Close"]',
-    ".ytd-popup-container button",
-    'ytd-button-renderer:has-text("No thanks")',
-  ];
-
-  for (const selector of popupSelectors) {
-    try {
-      const popup = page.locator(selector).first();
-      if (await popup.isVisible({ timeout: 1000 })) {
-        await popup.click();
-        await page.waitForTimeout(500);
-        log.debug(`✅ Dismissed popup: ${selector}`);
-      }
-    } catch (error) {
-      // Popup not found, continue
-    }
-  }
-}
-
-export async function expandDescription(page: Page): Promise<void> {
+export async function clickElement(
+  page: Page,
+  selectors: string[],
+  successMessage: string,
+  errorMessage?: string,
+): Promise<void> {
   try {
-    const showMoreButton = page.locator("#expand").first();
-    if (await showMoreButton.isVisible({ timeout: 2000 })) {
-      await showMoreButton.click();
-      await page.waitForTimeout(1000);
-      log.debug("📖 Description expanded");
+    for (const selector of selectors) {
+      const element = page.locator(selector).first();
+      if (await element.isVisible()) {
+        await element.click();
+        log.debug(successMessage);
+        return;
+      }
     }
   } catch (error) {
-    log.debug("⚠️ Could not expand description");
+    log.error(error);
   }
+  errorMessage && log.debug(errorMessage);
+  await page.waitForTimeout(PAUSE);
 }
+
+const handleConsentDialog = async (page: Page) =>
+  clickElement(
+    page,
+    ['button:has-text("Accept all")'],
+    "✅ Accepted consent dialog",
+  );
+
+const enableDarkMode = async (page: Page) => {
+  try {
+    // Method 1: Set dark theme attributes on the document
+    await page.evaluate(() => {
+      document.documentElement.setAttribute("dark", "");
+      document.documentElement.setAttribute("data-theme", "dark");
+      document.documentElement.style.colorScheme = "dark";
+    });
+
+    // Method 2: Inject CSS for dark mode
+    // await page.addStyleTag({
+    //   content: `
+    //     html[dark], html[data-theme="dark"] {
+    //       background-color: #0f0f0f !important;
+    //       color: #ffffff !important;
+    //     }
+    //     ytd-app {
+    //       background-color: #0f0f0f !important;
+    //     }
+    //     #content, #primary, #secondary {
+    //       background-color: #0f0f0f !important;
+    //     }
+    //     ytd-watch-flexy {
+    //       background-color: #0f0f0f !important;
+    //     }
+    //   `,
+    // });
+
+    log.debug("🌙 Dark mode enabled");
+  } catch (error) {
+    log.debug("⚠️ Could not enable dark mode");
+  }
+  await page.waitForTimeout(PAUSE);
+};
+
+const enableTheaterMode = async (page: Page) =>
+  clickElement(
+    page,
+    ['button[title*="Theater"], button[aria-label*="Theater"]'],
+    "🎭 Theater mode enabled",
+    "⚠️ Could not enable theater mode",
+  );
+
+const dismissPopups = async (page: Page) =>
+  clickElement(
+    page,
+    [
+      "button[aria-label*='Dismiss']",
+      "button[aria-label*='Close']",
+      "#dismiss-button",
+      ".ytd-popup-container button",
+      "ytd-button-renderer:has-text('Dismiss')",
+    ],
+    "✅ Dismissed popup",
+  );
+
+const expandDescription = async (page: Page) =>
+  clickElement(
+    page,
+    ["div#description"],
+    "📖 Description expanded",
+    "⚠️ Could not expand description (not found)",
+  );
 
 export async function pauseVideo(page: Page): Promise<void> {
   try {
-    await page.waitForSelector("video", { timeout: VIDEO_SELECTOR_TIMEOUT });
+    await page.waitForSelector("video", { timeout: PAUSE });
     await page.evaluate(() => {
       const video = document.querySelector("video");
       if (video && !video.paused) {
@@ -188,6 +208,7 @@ export async function pauseVideo(page: Page): Promise<void> {
   } catch (error) {
     log.debug("⚠️ Could not pause video");
   }
+  await page.waitForTimeout(PAUSE);
 }
 
 export async function scrollToLoadVideos(page: Page): Promise<void> {
@@ -197,11 +218,11 @@ export async function scrollToLoadVideos(page: Page): Promise<void> {
     await page.evaluate(() => {
       window.scrollTo(0, document.body.scrollHeight);
     });
-    await page.waitForTimeout(SCROLL_DELAY);
+    await page.waitForTimeout(PAUSE);
     log.debug(`📜 Scroll iteration ${i + 1}/${SCROLL_ITERATIONS}`);
   }
 
   // Scroll back to top
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(SCROLL_DELAY);
+  await page.waitForTimeout(PAUSE);
 }

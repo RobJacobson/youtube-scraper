@@ -13,6 +13,7 @@ export interface Config {
   useTheaterMode: boolean;
   hideSuggestedVideos: boolean;
   interactive: boolean;
+  saveCompleteHtml?: boolean;
 }
 
 // Video metadata structure
@@ -67,4 +68,5 @@ export interface PageConfig {
   useDarkMode?: boolean;
   useTheaterMode?: boolean;
   hideSuggestedVideos?: boolean;
+  skipDescriptionExpansion?: boolean;
 }

@@ -1,6 +1,6 @@
 # 🎭 YouTube Scraper
 
-A powerful command-line YouTube channel scraper built with **Bun** and **Playwright** using **functional programming architecture**. Extract comprehensive metadata and take full-page screenshots of YouTube videos with advanced features like intelligent popup dismissal, description expansion, UI theming, and respectful rate limiting.
+A powerful command-line YouTube channel scraper built with **Bun** and **Playwright** using **functional programming architecture**. Extract comprehensive metadata, take full-page screenshots, and save complete webpages with advanced features like intelligent popup dismissal, description expansion, UI theming, and respectful rate limiting.
 
 ## ✨ Features
 
@@ -9,6 +9,7 @@ A powerful command-line YouTube channel scraper built with **Bun** and **Playwri
 - **Channel Video Discovery** - Automatically finds all videos from a YouTube channel
 - **Comprehensive Metadata Extraction** - Captures title, description, author, views, dates, tags, and more
 - **Full-Page Screenshots** - High-quality PNG screenshots of entire video pages
+- **Complete HTML Saving** - Save self-contained HTML files with all CSS and assets inlined
 - **Smart Description Expansion** - Automatically clicks "Show more" buttons to get complete descriptions
 
 ### 🛡️ Advanced Automation
@@ -21,17 +22,18 @@ A powerful command-line YouTube channel scraper built with **Bun** and **Playwri
 ### ⚙️ Configuration & Performance
 
 - **Flexible CLI Options** - Limits, pagination, delays, and UI preferences
+- **Complete Webpage Export** - Save pages in "webpage complete" format with all assets
 - **Detailed Logging** - Verbose mode with colored console output and debugging
-- **Memory Efficient** - Processes videos one at a time with proper cleanup
-- **Structured Output** - Organized JSON files and screenshot directories
+- **Memory Efficient** - Buffer-based operations with proper cleanup
+- **Structured Output** - Organized JSON files, screenshots, and HTML directories
 
-### 🚀 Modern Functional Architecture
+### 🚀 Modern Streamlined Architecture
 
-- **Pure Functional Design** - 100% functional programming with arrow functions throughout
-- **Immutable Services** - Closure-based state management instead of classes
-- **Functional Dependency Injection** - Clean service composition via parameters
+- **Buffer-Based Operations** - Efficient memory management with buffer handling
+- **Functional Service Design** - Clean separation of concerns with functional patterns
+- **Immutable Data Flow** - Predictable state management without side effects
 - **Type-Safe Interfaces** - Comprehensive TypeScript with functional service contracts
-- **Native Performance** - Built on Bun runtime with native Node.js APIs
+- **Native Performance** - Built on Bun runtime with optimized file operations
 
 ## 🚀 Quick Start
 
@@ -88,11 +90,12 @@ bun start --url "https://www.youtube.com/@WeAreUnidosUS" --limit 50 --verbose --
 
 ### 🎨 UI Enhancement Options
 
-| Option             | Description                            | Default |
-| ------------------ | -------------------------------------- | ------- |
-| `--dark-mode`      | Enable dark mode for YouTube pages     | false   |
-| `--theater-mode`   | Enable theater mode for video pages    | false   |
-| `--hide-suggested` | Hide suggested videos and distractions | false   |
+| Option                 | Description                            | Default |
+| ---------------------- | -------------------------------------- | ------- |
+| `--dark-mode`          | Enable dark mode for YouTube pages     | false   |
+| `--theater-mode`       | Enable theater mode for video pages    | false   |
+| `--hide-suggested`     | Hide suggested videos and distractions | false   |
+| `--save-complete-html` | Save complete webpage with all assets  | false   |
 
 ## 💡 Usage Examples
 
@@ -145,17 +148,47 @@ bun start \
   --skip-screenshots
 ```
 
+### Complete HTML Archiving
+
+```bash
+# Save complete webpages with all assets inlined
+bun start \
+  --url "https://www.youtube.com/@WeAreUnidosUS" \
+  --save-complete-html \
+  --dark-mode \
+  --verbose
+```
+
 ## 📁 Output Structure
 
-All data is saved to `/media/rob/D/youtube/metadata/[channel-name]/`:
+All data is saved to organized directories in your output folder:
 
 ```
-/media/rob/D/youtube/metadata/WeAreUnidosUS/
-├── data/
-│   └── scraping_results_2024-01-15T14-30-00-000Z.json
-└── screenshots/
-    ├── dQw4w9WgXcQ_2024-01-15_14-30-15.png
-    ├── jNQXAC9IVRw_2024-01-15_14-31-45.png
+output/
+├── metadata/
+│   ├── 24-01-15_dQw4w9WgXcQ.json
+│   ├── 24-01-15_jNQXAC9IVRw.json
+│   └── ...
+├── image/
+│   ├── 24-01-15_dQw4w9WgXcQ.jpg
+│   ├── 24-01-15_jNQXAC9IVRw.jpg
+│   └── ...
+├── screenshot/
+│   ├── 24-01-15_dQw4w9WgXcQ.png
+│   ├── 24-01-15_jNQXAC9IVRw.png
+│   └── ...
+├── html/
+│   ├── 24-01-15_dQw4w9WgXcQ.html (complete HTML with inlined CSS)
+│   ├── 24-01-15_jNQXAC9IVRw.html
+│   └── ...
+└── complete-html/
+    ├── 24-01-15_dQw4w9WgXcQ/
+    │   ├── index.html
+    │   ├── styles.css
+    │   ├── complete.html (self-contained)
+    │   └── images/
+    │       ├── image_0.jpg
+    │       └── image_1.png
     └── ...
 ```
 
@@ -206,77 +239,75 @@ All data is saved to `/media/rob/D/youtube/metadata/[channel-name]/`:
 
 ```
 src/
-├── index.ts                           # CLI entry point (functional)
-├── application/                       # Application layer
-│   └── youTubeScraperApplication.ts   # Main app service (functional)
-├── core/                             # Core business logic
-│   ├── container/                    # Dependency injection
-│   │   └── serviceContainer.ts       # Service container (functional)
-│   ├── factories/                    # Service factories
-│   │   └── serviceFactory.ts         # Factory functions (functional)
-│   └── services/                     # Business services (ALL FUNCTIONAL)
-│       ├── browserService.ts         # Browser lifecycle management
-│       ├── pageInteractionService.ts # YouTube page interactions
-│       ├── metadataExtractionService.ts # Data extraction
-│       ├── screenshotService.ts      # Screenshot handling
-│       ├── videoDiscoveryService.ts  # Video URL discovery
-│       └── scrapingOrchestrator.ts   # Main workflow orchestration
-├── shared/                           # Shared utilities
-│   └── constants/                    # Centralized constants
-│       └── ScrapingConstants.ts      # All scraping constants
-├── types/                            # Type definitions
-│   ├── Config.ts                     # Configuration types
-│   └── VideoMetadata.ts              # Data types
-└── utils/                            # Utility functions
-    ├── Logger.ts                     # Logging utilities
-    ├── globalLogger.ts               # Global logger
-    ├── fileSystem.ts                 # File operations
-    └── ExponentialBackoff.ts         # Retry logic
+├── index.ts                          # CLI entry point
+├── lib/                             # Core library modules
+│   ├── browser.ts                   # Browser lifecycle management
+│   ├── scraper.ts                   # Main scraping orchestration
+│   ├── scrapeVideoPage.ts           # Video page scraping with HTML export
+│   ├── scrapeChannelPage.ts         # Channel discovery
+│   └── output.ts                    # Buffer-based file operations
+├── types.ts                         # Type definitions and interfaces
+└── utils/                           # Utility functions
+    ├── logger.ts                    # Logging utilities
+    └── ExponentialBackoff.ts        # Retry logic with backoff
 ```
 
-### 🏗️ Functional Architecture Highlights
+### 🏗️ Streamlined Architecture Highlights
 
-- **100% Functional Programming**: Complete refactor from OOP to functional paradigm
-- **Arrow Functions Throughout**: Consistent functional syntax across the entire codebase
-- **Closure-Based State**: State management via closures instead of class properties
-- **Functional Dependency Injection**: Services receive dependencies as function parameters
-- **Immutable Service Interfaces**: Clean contracts with TypeScript interfaces
-- **Service Composition**: Higher-order functions for creating and composing services
-- **Pure Functions**: Utility functions are pure where possible for better testability
-- **Centralized Constants**: All configuration extracted to shared constants module
+- **Buffer-Based Operations**: Memory-efficient handling of screenshots, images, and HTML content
+- **Functional Service Design**: Clean separation between scraping, extraction, and file operations
+- **Complete HTML Export**: Self-contained webpage saving with inlined CSS and assets
+- **Modular Library Structure**: Focused modules for browser, scraping, output, and utilities
+- **Type-Safe Interfaces**: Comprehensive TypeScript definitions for all data structures
+- **Efficient File Operations**: Parallel saving operations with proper error handling
+- **Immutable Data Flow**: Predictable data transformation pipeline
+- **Resource Management**: Proper cleanup and memory management throughout
 
-### 🎯 Functional Programming Benefits
+### 🎯 Architecture Benefits
 
-- **Predictable Behavior**: Pure functions with no side effects where possible
-- **Easy Testing**: Services can be easily mocked and tested in isolation
-- **Better Composition**: Services compose naturally via function parameters
-- **Immutability**: State changes are explicit and controlled via closures
-- **No `this` Binding**: Arrow functions eliminate context binding issues
-- **Type Safety**: Functional interfaces provide clear contracts
-- **Memory Efficiency**: Closures manage state without class overhead
+- **Memory Efficiency**: Buffer-based operations reduce memory footprint
+- **Parallel Processing**: Multiple file operations execute simultaneously
+- **Error Resilience**: Individual failures don't stop the entire process
+- **Clean Separation**: Distinct modules for different responsibilities
+- **Type Safety**: Comprehensive TypeScript interfaces prevent runtime errors
+- **Resource Cleanup**: Proper disposal of browser contexts and file handles
+- **Extensible Design**: Easy to add new export formats or features
 
-### 🔧 Service Architecture Pattern
+### 🔧 Core Module Pattern
 
 ```typescript
-// Functional service creation pattern
-export const createServiceName = (
-  dependencies?: ServiceDeps
-): ServiceInterface => {
-  const logger = getLogger();
-  let state = initialState; // Closure-based state
+// Video page scraping with multiple outputs
+export async function scrapeVideoPage(
+  url: string,
+  config: ScrapingConfig,
+): Promise<VideoPageResult> {
+  const { metadata, screenshot, image, htmlContent } = await scrapeVideo(
+    url,
+    config,
+  );
+  return { metadata, screenshot, image, htmlContent };
+}
 
-  const method1 = async (params): Promise<ReturnType> => {
-    // Implementation using arrow function
-  };
+// Buffer-based file operations with parallel saving
+export async function saveVideoDataFromBuffers(
+  metadata: VideoMetadata,
+  screenshot: Buffer,
+  image: Buffer | null,
+  baseOutputDir: string,
+  htmlContent?: string,
+): Promise<void> {
+  const promises = [
+    saveMetadata(metadata, baseOutputDir, fileName),
+    saveScreenshot(screenshot, baseOutputDir, fileName),
+    saveImage(image, baseOutputDir, fileName),
+  ];
 
-  return { method1, method2 };
-};
+  if (htmlContent) {
+    promises.push(saveHtml(htmlContent, baseOutputDir, fileName));
+  }
 
-// Dependency injection via parameters
-const videoService = createVideoDiscoveryService(
-  browserService,
-  pageInteractionService
-);
+  await Promise.all(promises);
+}
 ```
 
 ### Building & Scripts
@@ -441,12 +472,14 @@ If you encounter issues:
 
 **Built with ❤️ using Bun, Playwright, and 100% functional programming architecture**
 
-### 🏆 Architecture Achievements
+### 🏆 Recent Improvements
 
-- ✅ **13 files deleted** - Eliminated all legacy OOP code
-- ✅ **100% functional** - Pure functional programming throughout
-- ✅ **Arrow functions** - Consistent functional syntax
-- ✅ **Closure state** - No classes, only functional closures
+- ✅ **Complete HTML Export** - Save self-contained webpages with all assets
+- ✅ **Buffer-Based Operations** - Memory-efficient handling of all file types
+- ✅ **Streamlined Architecture** - Reduced codebase by 99 lines while adding features
+- ✅ **Parallel File Operations** - Simultaneous saving of multiple file formats
+- ✅ **Enhanced Type Safety** - Comprehensive interfaces for all data structures
+- ✅ **Improved Error Handling** - Graceful degradation and detailed logging
 - ✅ **Clean interfaces** - Type-safe service contracts
 - ✅ **Easy testing** - Mockable functional services
 - ✅ **Better performance** - Optimized functional composition

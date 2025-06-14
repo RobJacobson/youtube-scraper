@@ -14,11 +14,11 @@ const program = new Command()
   .version("1.0.0")
   .option(
     "-u, --url <url>",
-    "YouTube channel URL (e.g., https://www.youtube.com/@WeAreUnidosUS)"
+    "YouTube channel URL (e.g., https://www.youtube.com/@WeAreUnidosUS)",
   )
   .option(
     "-v, --video <url>",
-    "Single YouTube video URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)"
+    "Single YouTube video URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)",
   )
   .option("-l, --limit <number>", "Maximum number of videos to scrape", "50")
   .option("-o, --offset <number>", "Starting offset for pagination", "0")
@@ -32,7 +32,7 @@ const program = new Command()
   .option(
     "-i, --interactive",
     "Interactive mode - pause after each screenshot",
-    false
+    false,
   );
 
 const main = async (): Promise<void> => {
@@ -80,15 +80,13 @@ const main = async (): Promise<void> => {
     }
 
     // Execute the scraping process
-    const result = isSingleVideo
-      ? await scraper.scrapeSingleVideo(config)
-      : await scraper.scrapeChannel(config);
+    const result = await scraper.scrapeChannel(config);
 
     // Show results summary
     console.log("\n✅ Scraping completed successfully!");
     console.log(`📁 Files organized in folders: ${config.outputDir}`);
     console.log(
-      `📊 Results: ${result.summary.successful}/${result.summary.total_attempted} successful`
+      `📊 Results: ${result.summary.successful}/${result.summary.total_attempted} successful`,
     );
   } catch (error) {
     console.error("\n❌ Scraping failed:", error);
