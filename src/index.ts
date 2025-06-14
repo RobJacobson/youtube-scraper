@@ -2,11 +2,11 @@
 
 import { Command } from "commander";
 import inquirer from "inquirer";
-import { Config } from "./types/Config";
-import { getServiceContainer } from "./core/container/serviceContainer";
+import { Config } from "./types";
 import { initializeLogger } from "./utils/logger";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import * as scraper from "./lib/scraper";
 
 const program = new Command()
   .name("youtube-scraper")
@@ -73,8 +73,6 @@ const main = async (): Promise<void> => {
   // Initialize global logger
   initializeLogger(config.verbose);
 
-  const serviceContainer = getServiceContainer();
-
   try {
     // Setup base output directory
     if (!existsSync(config.outputDir)) {
@@ -82,26 +80,19 @@ const main = async (): Promise<void> => {
     }
 
     // Execute the scraping process
-    let result;
-    if (isSingleVideo) {
-      result = await serviceContainer.scrapingOrchestrator.scrapeSingleVideo(
-        config
-      );
-    } else {
-      result = await serviceContainer.scrapingOrchestrator.scrapeChannel(
-        config
-      );
-    }
+    const result = isSingleVideo
+      ? await scraper.scrapeSingleVideo(config)
+      : await scraper.scrapeChannel(config);
 
-    // No need to save results separately - they're saved individually per video
+    // Show results summary
     console.log("\n✅ Scraping completed successfully!");
-    console.log(`📁 Individual video folders created in: ${config.outputDir}`);
+    console.log(`📁 Files organized in folders: ${config.outputDir}`);
+    console.log(
+      `📊 Results: ${result.summary.successful}/${result.summary.total_attempted} successful`
+    );
   } catch (error) {
     console.error("\n❌ Scraping failed:", error);
     process.exit(1);
-  } finally {
-    // Cleanup services
-    await serviceContainer.cleanup();
   }
 };
 
